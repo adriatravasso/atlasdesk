@@ -160,3 +160,35 @@ export type AssetPage = {
   totalElements: number;
   totalPages: number;
 };
+
+export type TicketStatus =
+  "OPEN" | "IN_PROGRESS" | "PENDING_APPROVAL" | "RESOLVED" | "CLOSED";
+export type TicketPriority = "LOW" | "MEDIUM" | "HIGH";
+
+export type Ticket = {
+  id: number;
+  organizationId: number;
+  title: string;
+  description: string;
+  requesterId: number;
+  requesterName: string;
+  assignedAgentId: number | null;
+  assignedAgentName: string | null;
+  assetId: number | null;
+  assetNumber: string | null;
+  priority: TicketPriority;
+  status: TicketStatus;
+  createdAt: string;
+  updatedAt: string;
+  dueAt: string;
+  resolvedAt: string | null;
+  closedAt: string | null;
+};
+
+export type TicketPage = {
+  content: Ticket[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
