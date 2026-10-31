@@ -1075,6 +1075,7 @@ function TicketsPage() {
           Buscar
         </button>
       </form>
+      <TicketLegend />
       {loading && <p role="status">Carregando chamados…</p>}
       {error && (
         <div className="notice notice--error" role="alert">
@@ -1110,6 +1111,7 @@ function TicketsPage() {
                     <th>Chamado</th>
                     <th>Status</th>
                     <th>Prioridade</th>
+                    <th>Prazo SLA</th>
                     <th>Solicitante</th>
                     <th>Atualizado</th>
                   </tr>
@@ -1141,7 +1143,30 @@ function TicketsPage() {
                           </span>
                         )}
                       </td>
-                      <td>{priorityName(ticket.priority)}</td>
+                      <td>
+                        <span
+                          className={`priority-tag priority-tag--${ticket.priority.toLowerCase()}`}
+                        >
+                          {priorityName(ticket.priority)}
+                        </span>
+                      </td>
+                      <td>
+                        {ticket.dueAt ? (
+                          <time dateTime={ticket.dueAt}>
+                            {formatDate(ticket.dueAt)}
+                          </time>
+                        ) : (
+                          <span>Sem prazo SLA</span>
+                        )}
+                        {ticket.overdue && (
+                          <span
+                            className="ticket-overdue"
+                            aria-label="Chamado atrasado"
+                          >
+                            Atrasado
+                          </span>
+                        )}
+                      </td>
                       <td>{ticket.requesterName}</td>
                       <td>{formatDate(ticket.updatedAt)}</td>
                     </tr>
@@ -1598,7 +1623,13 @@ function TicketDetailPage() {
             </div>
             <div>
               <dt>Prioridade</dt>
-              <dd>{priorityName(ticket.priority)}</dd>
+              <dd>
+                <span
+                  className={`priority-tag priority-tag--${ticket.priority.toLowerCase()}`}
+                >
+                  {priorityName(ticket.priority)}
+                </span>
+              </dd>
             </div>
             <div>
               <dt>Aberto em</dt>
@@ -1611,9 +1642,18 @@ function TicketDetailPage() {
             <div>
               <dt>Prazo SLA</dt>
               <dd>
-                {formatDate(ticket.dueAt)}{" "}
+                {ticket.dueAt ? (
+                  <time dateTime={ticket.dueAt}>
+                    {formatDate(ticket.dueAt)}
+                  </time>
+                ) : (
+                  "Sem prazo SLA"
+                )}{" "}
                 {ticket.overdue && (
-                  <span className="ticket-overdue" role="status">
+                  <span
+                    className="ticket-overdue"
+                    aria-label="Chamado atrasado"
+                  >
                     Atrasado
                   </span>
                 )}
@@ -1675,6 +1715,49 @@ function statusName(status: TicketStatus) {
     RESOLVED: "Resolvido",
     CLOSED: "Fechado",
   }[status];
+}
+
+function TicketLegend() {
+  const statuses: TicketStatus[] = [
+    "OPEN",
+    "IN_PROGRESS",
+    "PENDING_APPROVAL",
+    "RESOLVED",
+    "CLOSED",
+  ];
+  const priorities: TicketPriority[] = ["LOW", "MEDIUM", "HIGH"];
+
+  return (
+    <section
+      className="ticket-legend"
+      aria-label="Legenda de status e prioridade"
+    >
+      <h2>Legenda</h2>
+      <div className="ticket-legend-group">
+        <span className="ticket-legend-label">Status</span>
+        {statuses.map((status) => (
+          <span
+            className={`status-tag ticket-status ticket-status--${status.toLowerCase()}`}
+            key={status}
+          >
+            {statusName(status)}
+          </span>
+        ))}
+      </div>
+      <div className="ticket-legend-group">
+        <span className="ticket-legend-label">Prioridade</span>
+        {priorities.map((priority) => (
+          <span
+            className={`priority-tag priority-tag--${priority.toLowerCase()}`}
+            key={priority}
+          >
+            {priorityName(priority)}
+          </span>
+        ))}
+        <span className="ticket-overdue">Atrasado</span>
+      </div>
+    </section>
+  );
 }
 
 function priorityName(priority: TicketPriority) {

@@ -19,7 +19,7 @@ public record TicketSummary(Long id, Long organizationId, String title, String d
 
     public TicketSummary withOverdue(Instant now) {
         boolean late = status != TicketStatus.RESOLVED && status != TicketStatus.CLOSED
-                && dueAt.isBefore(now);
+                && dueAt != null && dueAt.isBefore(now);
         return new TicketSummary(id, organizationId, title, description, requesterId, requesterName,
                 assignedAgentId, assignedAgentName, assetId, assetNumber, priority, status,
                 createdAt, updatedAt, dueAt, resolvedAt, closedAt, late);

@@ -83,6 +83,7 @@ services:
     command: ["npm install --prefer-offline && npx cypress run --browser chrome"]
     environment:
       CYPRESS_CACHE_FOLDER: /root/.cache/Cypress
+      TZ: America/Manaus
       CYPRESS_ADMIN_EMAIL: atlasdesk-admin@localhost.test
       CYPRESS_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
       CYPRESS_ADMIN_ORGANIZATION_ID: ${DEV_ADMIN_ORGANIZATION_ID:-1}
