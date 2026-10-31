@@ -166,6 +166,24 @@ export type TicketStatus =
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH";
 export type TicketCommand =
   "START" | "RESOLVE" | "APPROVE" | "REJECT" | "CLOSE";
+export type TicketHistoryEventType =
+  | "CREATED"
+  | "ASSIGNED"
+  | "STARTED"
+  | "RESOLUTION_REQUESTED"
+  | "RESOLVED"
+  | "APPROVED"
+  | "REJECTED"
+  | "CLOSED";
+
+export type TicketHistoryEntry = {
+  id: number;
+  eventType: TicketHistoryEventType;
+  actorId: number;
+  actorName: string;
+  description: string;
+  occurredAt: string;
+};
 
 export type Ticket = {
   id: number;

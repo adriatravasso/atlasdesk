@@ -169,6 +169,10 @@ function openTicketAs(
     statusCode: 200,
     body: ticket(ticketId, status, assignedAgentId),
   });
+  cy.intercept("GET", `/api/tickets/${ticketId}/history`, {
+    statusCode: 200,
+    body: [],
+  });
   cy.visit(`/tickets/${ticketId}`);
   cy.contains("h1", `Ticket ${ticketId}`).should("be.visible");
 }

@@ -91,7 +91,7 @@ describe("Ticket handling", () => {
       cy.contains("button", "Iniciar atendimento").should("not.exist");
       cy.contains("button", "Resolver chamado").should("not.exist");
       cy.get('[aria-label="Linha do tempo do chamado"]')
-        .should("contain.text", "Chamado aberto")
+        .should("contain.text", "Chamado criado")
         .and("contain.text", "Chamado resolvido")
         .and("contain.text", "Chamado encerrado");
     });

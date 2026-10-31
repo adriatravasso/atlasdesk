@@ -20,6 +20,7 @@ import {
   type OrganizationSettings,
   type Ticket,
   type TicketCommand,
+  type TicketHistoryEntry,
   type TicketPage,
   type TicketPriority,
   type TicketStatus,
@@ -1380,6 +1381,10 @@ function TicketDetailPage() {
   const { ticketId } = useParams();
   const location = useLocation();
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [history, setHistory] = useState<TicketHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyReloadToken, setHistoryReloadToken] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState(
@@ -1417,6 +1422,27 @@ function TicketDetailPage() {
     };
   }, [ticketId, reloadToken]);
 
+  const currentTicketId = ticket?.id;
+  useEffect(() => {
+    if (currentTicketId === undefined) return;
+    let active = true;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    request<TicketHistoryEntry[]>(`/tickets/${currentTicketId}/history`)
+      .then((result) => {
+        if (active) setHistory(result);
+      })
+      .catch(() => {
+        if (active) setHistoryError("Não foi possível carregar o histórico.");
+      })
+      .finally(() => {
+        if (active) setHistoryLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [currentTicketId, historyReloadToken, reloadToken]);
+
   async function runAction(action: "assign" | TicketCommand) {
     if (!ticket || !user) return;
     if (
@@ -1443,6 +1469,7 @@ function TicketDetailPage() {
         },
       );
       setTicket(updated);
+      setHistoryReloadToken((token) => token + 1);
       setNotice(
         action === "assign"
           ? "Você assumiu este chamado."
@@ -1677,33 +1704,40 @@ function TicketDetailPage() {
             aria-label="Linha do tempo do chamado"
           >
             <h2>Histórico</h2>
-            <ol className="ticket-timeline">
-              {ticketTimeline(ticket).map((event) => (
-                <li key={`${event.label}-${event.at}`}>
-                  <strong>{event.label}</strong>
-                  <time dateTime={event.at}>{formatDate(event.at)}</time>
-                </li>
-              ))}
-            </ol>
+            {historyLoading && <p role="status">Carregando histórico…</p>}
+            {historyError && (
+              <div className="notice notice--error" role="alert">
+                {historyError}{" "}
+                <button
+                  className="text-button"
+                  onClick={() => setHistoryReloadToken((token) => token + 1)}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+            {!historyLoading && !historyError && history.length === 0 && (
+              <p className="empty-state">Nenhum evento registrado ainda.</p>
+            )}
+            {!historyLoading && !historyError && history.length > 0 && (
+              <ol className="ticket-timeline">
+                {history.map((event) => (
+                  <li key={event.id}>
+                    <div>
+                      <strong>{event.description}</strong>
+                      <span>por {event.actorName}</span>
+                    </div>
+                    <time dateTime={event.occurredAt}>
+                      {formatDate(event.occurredAt)}
+                    </time>
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
         </article>
       )}
     </section>
-  );
-}
-
-function ticketTimeline(ticket: Ticket) {
-  const events = [
-    { label: "Chamado aberto", at: ticket.createdAt },
-    ...(ticket.resolvedAt
-      ? [{ label: "Chamado resolvido", at: ticket.resolvedAt }]
-      : []),
-    ...(ticket.closedAt
-      ? [{ label: "Chamado encerrado", at: ticket.closedAt }]
-      : []),
-  ];
-  return events.sort(
-    (left, right) => Date.parse(left.at) - Date.parse(right.at),
   );
 }
 
