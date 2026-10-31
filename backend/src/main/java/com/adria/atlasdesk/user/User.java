@@ -106,6 +106,16 @@ public class User {
         active = false;
     }
 
+    public void updateProfile(String name, String email, UserRole role, boolean active, String passwordHash) {
+        this.name = name;
+        this.email = email;
+        this.role = role;
+        this.active = active;
+        if (passwordHash != null) {
+            this.passwordHash = passwordHash;
+        }
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
