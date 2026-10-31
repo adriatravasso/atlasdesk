@@ -1,6 +1,8 @@
 package com.adria.atlasdesk.ticket;
 
+import java.time.Instant;
 import java.util.Optional;
+import com.adria.atlasdesk.dashboard.TicketAggregateMetrics;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +10,31 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
+
+    @Query("""
+            select new com.adria.atlasdesk.dashboard.TicketAggregateMetrics(
+                count(ticket),
+                count(case when ticket.status = com.adria.atlasdesk.ticket.TicketStatus.OPEN then ticket.id end),
+                count(case when ticket.status = com.adria.atlasdesk.ticket.TicketStatus.IN_PROGRESS then ticket.id end),
+                count(case when ticket.status = com.adria.atlasdesk.ticket.TicketStatus.PENDING_APPROVAL then ticket.id end),
+                count(case when ticket.status = com.adria.atlasdesk.ticket.TicketStatus.RESOLVED then ticket.id end),
+                count(case when ticket.status = com.adria.atlasdesk.ticket.TicketStatus.CLOSED then ticket.id end),
+                count(case when ticket.status in (
+                    com.adria.atlasdesk.ticket.TicketStatus.OPEN,
+                    com.adria.atlasdesk.ticket.TicketStatus.IN_PROGRESS,
+                    com.adria.atlasdesk.ticket.TicketStatus.PENDING_APPROVAL
+                ) and ticket.dueAt < :asOf then ticket.id end),
+                count(case when ticket.priority = com.adria.atlasdesk.ticket.TicketPriority.LOW then ticket.id end),
+                count(case when ticket.priority = com.adria.atlasdesk.ticket.TicketPriority.MEDIUM then ticket.id end),
+                count(case when ticket.priority = com.adria.atlasdesk.ticket.TicketPriority.HIGH then ticket.id end)
+            )
+            from Ticket ticket
+            where ticket.organization.id = :organizationId
+              and (:requesterOnly = false or ticket.requester.id = :requesterId)
+            """)
+    TicketAggregateMetrics aggregateDashboardMetrics(@Param("organizationId") Long organizationId,
+            @Param("requesterId") Long requesterId, @Param("requesterOnly") boolean requesterOnly,
+            @Param("asOf") Instant asOf);
 
     Optional<Ticket> findByIdAndOrganizationId(Long id, Long organizationId);
 

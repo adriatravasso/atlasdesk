@@ -120,6 +120,52 @@ class TicketControllerTest {
     }
 
     @Test
+    void dashboardAggregatesOrganizationMetricsAndScopesRequesterTickets() throws Exception {
+        Organization organization = createOrganization("Dashboard metrics");
+        Organization foreignOrganization = createOrganization("Foreign dashboard metrics");
+        User requester = createUser(organization, "Dashboard Requester", UserRole.REQUESTER);
+        User otherRequester = createUser(organization, "Other Dashboard Requester", UserRole.REQUESTER);
+        User agent = createUser(organization, "Dashboard Agent", UserRole.AGENT);
+        User admin = createUser(organization, "Dashboard Admin", UserRole.ADMIN);
+        User foreignAdmin = createUser(foreignOrganization, "Foreign Dashboard Admin", UserRole.ADMIN);
+
+        Instant overdueAt = Instant.now().minus(Duration.ofHours(1));
+        createDashboardTicket(organization, requester, "Open low", TicketPriority.LOW, TicketStatus.OPEN,
+                overdueAt);
+        createDashboardTicket(organization, requester, "In progress medium", TicketPriority.MEDIUM,
+                TicketStatus.IN_PROGRESS, overdueAt);
+        createDashboardTicket(organization, requester, "Pending high", TicketPriority.HIGH,
+                TicketStatus.PENDING_APPROVAL, overdueAt);
+        createDashboardTicket(organization, requester, "Resolved low", TicketPriority.LOW,
+                TicketStatus.RESOLVED, overdueAt);
+        createDashboardTicket(organization, requester, "Closed high", TicketPriority.HIGH,
+                TicketStatus.CLOSED, overdueAt);
+        createDashboardTicket(organization, otherRequester, "Other requester high", TicketPriority.HIGH,
+                TicketStatus.OPEN, Instant.now().plus(Duration.ofDays(1)));
+        createDashboardTicket(foreignOrganization, foreignAdmin, "Foreign overdue", TicketPriority.HIGH,
+                TicketStatus.OPEN, overdueAt);
+
+        createAsset(organization, "DASH-1", "Dashboard active one");
+        createAsset(organization, "DASH-2", "Dashboard active two");
+        Asset inactiveAsset = createAsset(organization, "DASH-3", "Dashboard inactive");
+        inactiveAsset.updateProfile(inactiveAsset.getAssetNumber(), inactiveAsset.getName(),
+                inactiveAsset.getType(), inactiveAsset.getDescription(), AssetStatus.INACTIVE);
+        assets.saveAndFlush(inactiveAsset);
+        createAsset(foreignOrganization, "FOREIGN-DASH-1", "Foreign active asset");
+
+        CsrfFixture csrf = fetchCsrf();
+        MockHttpSession requesterSession = login(requester, csrf);
+        MockHttpSession agentSession = login(agent, csrf);
+        MockHttpSession adminSession = login(admin, csrf);
+        MockHttpSession foreignAdminSession = login(foreignAdmin, csrf);
+
+        assertOrganizationDashboard(requesterSession, 5, 1, 1, 1, 1, 1, 3, 2, 1, 2, 2);
+        assertOrganizationDashboard(agentSession, 6, 2, 1, 1, 1, 1, 3, 2, 1, 3, 2);
+        assertOrganizationDashboard(adminSession, 6, 2, 1, 1, 1, 1, 3, 2, 1, 3, 2);
+        assertOrganizationDashboard(foreignAdminSession, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1);
+    }
+
+    @Test
     void ticketHistoryIsTransactionalOrderedAndRestrictedToVisibleTickets() throws Exception {
         Organization organization = createOrganization("Ticket history", true);
         Organization foreignOrganization = createOrganization("Foreign ticket history");
@@ -595,6 +641,43 @@ class TicketControllerTest {
         };
         return tickets.saveAndFlush(new Ticket(organization, title, "Request description", requester, null,
                 priority, now, now.plusSeconds((long) hours * 3600)));
+    }
+
+    private Ticket createDashboardTicket(Organization organization, User requester, String title,
+            TicketPriority priority, TicketStatus status, Instant dueAt) {
+        Instant now = Instant.now();
+        Ticket ticket = new Ticket(organization, title, "Dashboard metric fixture", requester, null,
+                priority, now, dueAt);
+        if (status != TicketStatus.OPEN) {
+            ticket.transition(TicketCommand.START, now, false);
+        }
+        if (status == TicketStatus.PENDING_APPROVAL) {
+            ticket.transition(TicketCommand.RESOLVE, now, true);
+        } else if (status == TicketStatus.RESOLVED || status == TicketStatus.CLOSED) {
+            ticket.transition(TicketCommand.RESOLVE, now, false);
+            if (status == TicketStatus.CLOSED) {
+                ticket.transition(TicketCommand.CLOSE, now, false);
+            }
+        }
+        return tickets.saveAndFlush(ticket);
+    }
+
+    private void assertOrganizationDashboard(MockHttpSession session, int total, int open, int inProgress,
+            int pendingApproval, int resolved, int closed, int overdue, int low, int medium, int high,
+            int activeAssets) throws Exception {
+        mockMvc.perform(get("/api/dashboard").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalTickets").value(total))
+                .andExpect(jsonPath("$.openTickets").value(open))
+                .andExpect(jsonPath("$.inProgressTickets").value(inProgress))
+                .andExpect(jsonPath("$.pendingApprovalTickets").value(pendingApproval))
+                .andExpect(jsonPath("$.resolvedTickets").value(resolved))
+                .andExpect(jsonPath("$.closedTickets").value(closed))
+                .andExpect(jsonPath("$.overdueTickets").value(overdue))
+                .andExpect(jsonPath("$.priorityDistribution.low").value(low))
+                .andExpect(jsonPath("$.priorityDistribution.medium").value(medium))
+                .andExpect(jsonPath("$.priorityDistribution.high").value(high))
+                .andExpect(jsonPath("$.activeAssets").value(activeAssets));
     }
 
     private org.springframework.test.web.servlet.ResultActions performTransition(long ticketId,
