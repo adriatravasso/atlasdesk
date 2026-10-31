@@ -1,7 +1,9 @@
 package com.adria.atlasdesk.ticket;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -20,6 +22,8 @@ import com.adria.atlasdesk.user.UserRole;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,6 +33,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -57,6 +62,9 @@ class TicketControllerTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Test
     void requesterCanCreateTicketWithOptionalAssetAndReadFilteredPageAndDetail() throws Exception {
@@ -219,6 +227,179 @@ class TicketControllerTest {
                 .andExpect(jsonPath("$.status").value("OPEN"));
         mockMvc.perform(get("/api/tickets"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void assignedAgentHandlesTicketAndRequesterOrAdminCanCloseIt() throws Exception {
+        Organization organization = createOrganization("Ticket transitions");
+        User requester = createUser(organization, "Request Owner", UserRole.REQUESTER);
+        User agent = createUser(organization, "Assigned Agent", UserRole.AGENT);
+        User otherAgent = createUser(organization, "Other Agent", UserRole.AGENT);
+        User admin = createUser(organization, "Ticket Admin", UserRole.ADMIN);
+        Ticket requesterTicket = createTicket(organization, requester, "Requester flow", TicketPriority.HIGH);
+        Ticket adminTicket = createTicket(organization, requester, "Admin flow", TicketPriority.LOW);
+        Ticket agentAssignedTicket = createTicket(organization, requester, "Agent assignment", TicketPriority.MEDIUM);
+        CsrfFixture csrf = fetchCsrf();
+        MockHttpSession requesterSession = login(requester, csrf);
+        MockHttpSession agentSession = login(agent, csrf);
+        MockHttpSession otherAgentSession = login(otherAgent, csrf);
+        MockHttpSession adminSession = login(admin, csrf);
+
+        mockMvc.perform(patch("/api/tickets/{id}/assign", requesterTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content("{\"assignedAgentId\":" + agent.getId() + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedAgentId").value(agent.getId()));
+        mockMvc.perform(post("/api/tickets/{id}/transition", requesterTicket.getId())
+                        .session(otherAgentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"START\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/tickets/{id}/transition", requesterTicket.getId())
+                        .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"START\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+        mockMvc.perform(post("/api/tickets/{id}/transition", requesterTicket.getId())
+                        .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"RESOLVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.resolvedAt").isNotEmpty())
+                .andExpect(jsonPath("$.closedAt").value(org.hamcrest.Matchers.nullValue()));
+        mockMvc.perform(post("/api/tickets/{id}/transition", requesterTicket.getId())
+                        .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"CLOSE\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(patch("/api/tickets/{id}/assign", requesterTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content("{\"assignedAgentId\":" + otherAgent.getId() + "}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/tickets/{id}/transition", requesterTicket.getId())
+                        .session(requesterSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"CLOSE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CLOSED"))
+                .andExpect(jsonPath("$.resolvedAt").isNotEmpty())
+                .andExpect(jsonPath("$.closedAt").isNotEmpty());
+
+        mockMvc.perform(patch("/api/tickets/{id}/assign", adminTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content("{\"assignedAgentId\":" + agent.getId() + "}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/tickets/{id}/assign", agentAssignedTicket.getId())
+                        .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content("{\"assignedAgentId\":" + otherAgent.getId() + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedAgentId").value(otherAgent.getId()));
+        for (String command : new String[] {"START", "RESOLVE", "CLOSE"}) {
+            mockMvc.perform(post("/api/tickets/{id}/transition", adminTicket.getId())
+                            .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                            .contentType("application/json").content("{\"command\":\"" + command + "\"}"))
+                    .andExpect(status().isOk());
+        }
+        assertThat(tickets.findById(adminTicket.getId()).orElseThrow().getStatus()).isEqualTo(TicketStatus.CLOSED);
+    }
+
+    @Test
+    void rejectsInvalidTransitionAssigneeAndCrossOrganizationOperations() throws Exception {
+        Organization organization = createOrganization("Ticket invalid operations");
+        Organization foreignOrganization = createOrganization("Ticket foreign operations");
+        User requester = createUser(organization, "Request Owner", UserRole.REQUESTER);
+        User admin = createUser(organization, "Ticket Admin", UserRole.ADMIN);
+        User agent = createUser(organization, "Valid Agent", UserRole.AGENT);
+        User inactiveAgent = createUser(organization, "Inactive Agent", UserRole.AGENT);
+        User requesterCandidate = createUser(organization, "Not An Agent", UserRole.REQUESTER);
+        User foreignAgent = createUser(foreignOrganization, "Foreign Agent", UserRole.AGENT);
+        inactiveAgent.deactivate();
+        users.saveAndFlush(inactiveAgent);
+        Ticket ownTicket = createTicket(organization, requester, "Invalid flow", TicketPriority.MEDIUM);
+        User foreignRequester = createUser(foreignOrganization, "Foreign Requester", UserRole.REQUESTER);
+        Ticket foreignTicket = createTicket(foreignOrganization, foreignRequester,
+                "Foreign operation target", TicketPriority.LOW);
+        CsrfFixture csrf = fetchCsrf();
+        MockHttpSession requesterSession = login(requester, csrf);
+        MockHttpSession adminSession = login(admin, csrf);
+        MockHttpSession agentSession = login(agent, csrf);
+
+        mockMvc.perform(patch("/api/tickets/{id}/assign", ownTicket.getId())
+                        .session(requesterSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"assignedAgentId\":" + agent.getId() + "}"))
+                .andExpect(status().isForbidden());
+        for (Long assigneeId : new Long[] {inactiveAgent.getId(), requesterCandidate.getId()}) {
+            mockMvc.perform(patch("/api/tickets/{id}/assign", ownTicket.getId())
+                            .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                            .contentType("application/json").content("{\"assignedAgentId\":" + assigneeId + "}"))
+                    .andExpect(status().isConflict());
+        }
+        mockMvc.perform(patch("/api/tickets/{id}/assign", ownTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content("{\"assignedAgentId\":" + foreignAgent.getId() + "}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(patch("/api/tickets/{id}/assign", foreignTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"assignedAgentId\":" + agent.getId() + "}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/tickets/{id}/transition", foreignTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"START\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(patch("/api/tickets/{id}/assign", ownTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"assignedAgentId\":" + agent.getId() + "}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/tickets/{id}/transition", ownTicket.getId())
+                        .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"RESOLVE\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/tickets/{id}/transition", ownTicket.getId())
+                        .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"START\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/tickets/{id}/transition", ownTicket.getId())
+                        .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"START\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/tickets/{id}/transition", ownTicket.getId())
+                        .session(requesterSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"REOPEN\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/tickets/{id}/transition", ownTicket.getId())
+                        .session(requesterSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"CLOSE\"}"))
+                .andExpect(status().isConflict());
+
+        entityManager.createNativeQuery("update tickets set status = 'PENDING_APPROVAL' where id = :id")
+                .setParameter("id", ownTicket.getId())
+                .executeUpdate();
+        entityManager.clear();
+        mockMvc.perform(post("/api/tickets/{id}/transition", ownTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"START\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void optimisticVersionRejectsAStaleConcurrentTicketUpdate() {
+        Organization organization = createOrganization("Ticket optimistic version");
+        User requester = createUser(organization, "Request Owner", UserRole.REQUESTER);
+        User firstAgent = createUser(organization, "First Agent", UserRole.AGENT);
+        User secondAgent = createUser(organization, "Second Agent", UserRole.AGENT);
+        Ticket ticket = createTicket(organization, requester, "Concurrent assignment", TicketPriority.LOW);
+        Ticket staleCopy = tickets.findById(ticket.getId()).orElseThrow();
+        entityManager.detach(staleCopy);
+
+        Ticket currentCopy = tickets.findById(ticket.getId()).orElseThrow();
+        currentCopy.assignTo(firstAgent);
+        tickets.saveAndFlush(currentCopy);
+        staleCopy.assignTo(secondAgent);
+
+        assertThatThrownBy(() -> tickets.saveAndFlush(staleCopy))
+                .isInstanceOf(OptimisticLockingFailureException.class);
     }
 
     private Organization createOrganization(String name) {

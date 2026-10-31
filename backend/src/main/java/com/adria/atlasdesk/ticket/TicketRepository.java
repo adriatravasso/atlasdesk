@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
+    Optional<Ticket> findByIdAndOrganizationId(Long id, Long organizationId);
+
     @Query(value = """
             select new com.adria.atlasdesk.ticket.TicketSummary(
                 ticket.id, ticket.organization.id, ticket.title, ticket.description,

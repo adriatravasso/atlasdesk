@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -57,10 +58,28 @@ public class TicketController {
         return tickets.get(id);
     }
 
+    @PatchMapping("/{id}/assign")
+    public TicketSummary assign(@PathVariable @Positive Long id,
+            @Valid @RequestBody AssignTicketRequest request) {
+        return tickets.assign(id, request.assignedAgentId());
+    }
+
+    @PostMapping("/{id}/transition")
+    public TicketSummary transition(@PathVariable @Positive Long id,
+            @Valid @RequestBody TransitionTicketRequest request) {
+        return tickets.transition(id, request.command());
+    }
+
     public record CreateTicketRequest(@NotBlank @Size(max = 160) String title,
             @NotBlank @Size(max = 4000) String description,
             @NotNull TicketPriority priority,
             @Positive Long assetId) {
+    }
+
+    public record AssignTicketRequest(@NotNull @Positive Long assignedAgentId) {
+    }
+
+    public record TransitionTicketRequest(@NotNull TicketCommand command) {
     }
 
     public record TicketPageResponse(List<TicketSummary> content, int page, int size,
