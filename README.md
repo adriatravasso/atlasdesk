@@ -38,6 +38,8 @@ The backend and frontend source directories are bind-mounted. Vite refreshes fro
 docker compose restart backend
 ```
 
+The Compose backend explicitly activates the `dev` Spring profile by default, which idempotently seeds the `AtlasDesk Local` organization without creating users or credentials. Set `SPRING_PROFILES_ACTIVE` in `.env` to change the active profile; production runs should not activate `dev`.
+
 Named volumes preserve PostgreSQL data and Maven, npm, Cypress, frontend dependency, E2E dependency, and backend build caches across container restarts. The example database credentials are for local development only. Set matching `POSTGRES_*` and `DB_*` values in `.env` when changing them.
 
 Build the application images or follow service logs when needed:
@@ -68,7 +70,7 @@ docker compose --profile e2e run --rm e2e
 
 The E2E project also has a container-only TypeScript check; see [`tests/e2e/README.md`](tests/e2e/README.md).
 
-Flyway runs during backend startup. No business tables or placeholder migrations are created.
+Flyway applies versioned schema migrations during backend startup. The initial migration creates organization and user tables; JPA validates the schema rather than updating it.
 
 ## Stop development
 
