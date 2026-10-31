@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/target
+**/.m2
+**/coverage
+**/cypress/screenshots
+**/cypress/videos

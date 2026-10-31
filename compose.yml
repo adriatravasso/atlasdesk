@@ -1,0 +1,90 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-atlasdesk}
+      POSTGRES_USER: ${POSTGRES_USER:-atlasdesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlasdesk_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atlasdesk} -d ${POSTGRES_DB:-atlasdesk}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: development
+    restart: unless-stopped
+    environment:
+      DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/atlasdesk}
+      DB_USERNAME: ${DB_USERNAME:-atlasdesk}
+      DB_PASSWORD: ${DB_PASSWORD:-atlasdesk_dev}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/workspace/backend
+      - maven_cache:/root/.m2
+      - backend_target:/workspace/backend/target
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/api/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 45s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: development
+    restart: unless-stopped
+    environment:
+      VITE_API_TARGET: http://backend:8080
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/workspace/frontend
+      - frontend_node_modules:/workspace/frontend/node_modules
+      - npm_cache:/root/.npm
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  e2e:
+    image: cypress/included:15.21.1
+    profiles: ["e2e"]
+    working_dir: /e2e
+    environment:
+      CYPRESS_CACHE_FOLDER: /root/.cache/Cypress
+    volumes:
+      - ./frontend/cypress:/e2e/cypress
+      - ./frontend/cypress.config.cjs:/e2e/cypress.config.cjs:ro
+      - cypress_cache:/root/.cache/Cypress
+    depends_on:
+      frontend:
+        condition: service_healthy
+    command: ["run", "--browser", "chrome"]
+
+volumes:
+  postgres_data:
+  maven_cache:
+  backend_target:
+  frontend_node_modules:
+  npm_cache:
+  cypress_cache:
