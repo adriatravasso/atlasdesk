@@ -17,3 +17,13 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:false}
+        same-site: lax
+
+app:
+  security:
+    cookie-secure: ${SESSION_COOKIE_SECURE:false}
