@@ -31,11 +31,11 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    CsrfTokenRepository csrfTokenRepository(@Value("${app.security.cookie-secure:false}") boolean secureCookie) {
-        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    CsrfTokenRepository csrfTokenRepository(@Value("${app.security.cookie-secure:true}") boolean secureCookie) {
+        CookieCsrfTokenRepository repository = new CookieCsrfTokenRepository();
         repository.setCookieCustomizer(cookie -> cookie
                 .path("/")
-                .httpOnly(false)
+                .httpOnly(true)
                 .secure(secureCookie)
                 .sameSite("Lax"));
         return repository;

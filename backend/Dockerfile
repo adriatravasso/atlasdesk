@@ -11,6 +11,8 @@ RUN mvn -B -ntp -DskipTests package
 
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
-COPY --from=package /workspace/backend/target/atlasdesk-api-0.0.1-SNAPSHOT.jar app.jar
+RUN addgroup -S atlasdesk && adduser -S -G atlasdesk atlasdesk
+COPY --from=package --chown=atlasdesk:atlasdesk /workspace/backend/target/atlasdesk-api-0.0.1-SNAPSHOT.jar app.jar
+USER atlasdesk:atlasdesk
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

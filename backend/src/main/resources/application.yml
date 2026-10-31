@@ -21,9 +21,9 @@ server:
     session:
       cookie:
         http-only: true
-        secure: ${SESSION_COOKIE_SECURE:false}
+        secure: ${SESSION_COOKIE_SECURE:true}
         same-site: lax
 
 app:
   security:
-    cookie-secure: ${SESSION_COOKIE_SECURE:false}
+    cookie-secure: ${SESSION_COOKIE_SECURE:true}
