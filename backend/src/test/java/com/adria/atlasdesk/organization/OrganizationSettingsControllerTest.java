@@ -136,8 +136,10 @@ class OrganizationSettingsControllerTest {
     void overdueIsComputedFromUtcClockAndResolvedOrClosedTicketsAreNotOverdue() {
         assertThat(summary(TicketStatus.OPEN, NOW.minusSeconds(1)).withOverdue(NOW).overdue()).isTrue();
         assertThat(summary(TicketStatus.IN_PROGRESS, NOW).withOverdue(NOW).overdue()).isFalse();
+        assertThat(summary(TicketStatus.PENDING_APPROVAL, NOW.minusSeconds(1)).withOverdue(NOW).overdue()).isTrue();
         assertThat(summary(TicketStatus.RESOLVED, NOW.minusSeconds(1)).withOverdue(NOW).overdue()).isFalse();
         assertThat(summary(TicketStatus.CLOSED, NOW.minusSeconds(1)).withOverdue(NOW).overdue()).isFalse();
+        assertThat(summary(TicketStatus.OPEN, null).withOverdue(NOW).overdue()).isFalse();
     }
 
     private static com.adria.atlasdesk.ticket.TicketSummary summary(TicketStatus status, Instant dueAt) {

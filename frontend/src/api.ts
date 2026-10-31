@@ -182,7 +182,7 @@ export type Ticket = {
   status: TicketStatus;
   createdAt: string;
   updatedAt: string;
-  dueAt: string;
+  dueAt: string | null;
   resolvedAt: string | null;
   closedAt: string | null;
   overdue: boolean;
