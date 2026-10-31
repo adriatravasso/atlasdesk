@@ -29,6 +29,7 @@ services:
       DB_USERNAME: ${DB_USERNAME:-atlasdesk}
       DB_PASSWORD: ${DB_PASSWORD:-atlasdesk_dev}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     ports:
       - "8080:8080"
     volumes:

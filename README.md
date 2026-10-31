@@ -40,6 +40,10 @@ docker compose restart backend
 
 The Compose backend explicitly activates the `dev` Spring profile by default, which idempotently seeds the `AtlasDesk Local` organization without creating users or credentials. Set `SPRING_PROFILES_ACTIVE` in `.env` to change the active profile; production runs should not activate `dev`.
 
+## Authentication
+
+The API uses an HttpOnly session cookie. In development, the Vite `/api` proxy keeps browser requests same-origin at `http://localhost:5173`. First call `GET /api/auth/csrf`; send its token in the named header and the `XSRF-TOKEN` cookie on `POST /api/auth/login` and `POST /api/auth/logout`. Login JSON contains `organizationId`, `email`, and `password`. `GET /api/auth/me` returns the signed-in user's public profile without password data. Do not store passwords or session identifiers in browser storage. `SESSION_COOKIE_SECURE` defaults to `false` for local HTTP; set it to `true` when serving the application over HTTPS.
+
 Named volumes preserve PostgreSQL data and Maven, npm, Cypress, frontend dependency, E2E dependency, and backend build caches across container restarts. The example database credentials are for local development only. Set matching `POSTGRES_*` and `DB_*` values in `.env` when changing them.
 
 Build the application images or follow service logs when needed:
