@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface AssetRepository extends JpaRepository<Asset, Long> {
 
+    long countByOrganizationIdAndStatus(Long organizationId, AssetStatus status);
+
     Optional<Asset> findByIdAndOrganizationId(Long id, Long organizationId);
 
     boolean existsByOrganizationIdAndAssetNumberIgnoreCase(Long organizationId, String assetNumber);
