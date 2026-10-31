@@ -18,6 +18,7 @@ import {
   type AssetPage,
   type AssetStatus,
   type Ticket,
+  type TicketCommand,
   type TicketPage,
   type TicketPriority,
   type TicketStatus,
@@ -1149,6 +1150,7 @@ function TicketCreatePage() {
 }
 
 function TicketDetailPage() {
+  const { user } = useAuth();
   const { ticketId } = useParams();
   const location = useLocation();
   const [ticket, setTicket] = useState<Ticket | null>(null);
@@ -1158,6 +1160,10 @@ function TicketDetailPage() {
     (location.state as { notice?: string } | null)?.notice ?? null,
   );
   const [reloadToken, setReloadToken] = useState(0);
+  const [busyAction, setBusyAction] = useState<"assign" | TicketCommand | null>(
+    null,
+  );
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -1185,6 +1191,70 @@ function TicketDetailPage() {
     };
   }, [ticketId, reloadToken]);
 
+  async function runAction(action: "assign" | TicketCommand) {
+    if (!ticket || !user) return;
+    if (
+      action === "CLOSE" &&
+      !window.confirm("Deseja encerrar este chamado?")
+    ) {
+      return;
+    }
+    setBusyAction(action);
+    setActionError(null);
+    setNotice(null);
+    try {
+      const updated = await request<Ticket>(
+        action === "assign"
+          ? `/tickets/${ticket.id}/assign`
+          : `/tickets/${ticket.id}/transition`,
+        {
+          method: action === "assign" ? "PATCH" : "POST",
+          body: JSON.stringify(
+            action === "assign"
+              ? { assignedAgentId: user.id }
+              : { command: action },
+          ),
+        },
+      );
+      setTicket(updated);
+      setNotice(
+        action === "assign"
+          ? "Você assumiu este chamado."
+          : action === "START"
+            ? "Atendimento iniciado."
+            : action === "RESOLVE"
+              ? "Chamado resolvido."
+              : "Chamado encerrado.",
+      );
+    } catch (cause) {
+      setActionError(
+        cause instanceof ApiError
+          ? cause.status === 409
+            ? "O chamado mudou enquanto você o atendia. Os dados foram atualizados; confira o estado antes de tentar novamente."
+            : cause.status === 403
+              ? "Sua conta não tem permissão para executar esta ação."
+              : cause.detail
+          : "Não foi possível atualizar o chamado. Tente novamente.",
+      );
+      if (cause instanceof ApiError && cause.status === 409) {
+        setReloadToken((token) => token + 1);
+      }
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  const isAdmin = user?.role === "ADMIN";
+  const isAgent = user?.role === "AGENT";
+  const isRequester = user?.role === "REQUESTER";
+  const canHandle =
+    isAdmin || (isAgent && ticket?.assignedAgentId === user?.id);
+  const canAssume =
+    isAgent && ticket?.status === "OPEN" && ticket.assignedAgentId === null;
+  const canClose =
+    ticket?.status === "RESOLVED" &&
+    (isAdmin || (isRequester && ticket.requesterId === user?.id));
+
   return (
     <section className="page-content">
       <Link className="back-link" to="/tickets">
@@ -1210,6 +1280,11 @@ function TicketDetailPage() {
           </button>
         </div>
       )}
+      {actionError && (
+        <div className="notice notice--error" role="alert">
+          {actionError}
+        </div>
+      )}
       {ticket && (
         <article className="ticket-detail-card">
           <div className="ticket-detail-heading">
@@ -1219,11 +1294,64 @@ function TicketDetailPage() {
             </div>
             <span
               className={`status-tag ticket-status ticket-status--${ticket.status.toLowerCase()}`}
+              role="status"
+              aria-label={`Status do chamado: ${statusName(ticket.status)}`}
             >
               {statusName(ticket.status)}
             </span>
           </div>
           <p className="ticket-description">{ticket.description}</p>
+          {(canAssume ||
+            (canHandle &&
+              (ticket.status === "OPEN" || ticket.status === "IN_PROGRESS")) ||
+            canClose) && (
+            <div
+              className="ticket-actions"
+              role="group"
+              aria-label="Ações do chamado"
+            >
+              {canAssume && (
+                <button
+                  className="button button--primary"
+                  onClick={() => void runAction("assign")}
+                  disabled={loading || busyAction !== null}
+                >
+                  {busyAction === "assign" ? "Assumindo…" : "Assumir chamado"}
+                </button>
+              )}
+              {canHandle && ticket.status === "OPEN" && (
+                <button
+                  className="button button--primary"
+                  onClick={() => void runAction("START")}
+                  disabled={loading || busyAction !== null}
+                >
+                  {busyAction === "START"
+                    ? "Iniciando…"
+                    : "Iniciar atendimento"}
+                </button>
+              )}
+              {canHandle && ticket.status === "IN_PROGRESS" && (
+                <button
+                  className="button button--primary"
+                  onClick={() => void runAction("RESOLVE")}
+                  disabled={loading || busyAction !== null}
+                >
+                  {busyAction === "RESOLVE"
+                    ? "Resolvendo…"
+                    : "Resolver chamado"}
+                </button>
+              )}
+              {canClose && (
+                <button
+                  className="button button--primary"
+                  onClick={() => void runAction("CLOSE")}
+                  disabled={loading || busyAction !== null}
+                >
+                  {busyAction === "CLOSE" ? "Encerrando…" : "Encerrar chamado"}
+                </button>
+              )}
+            </div>
+          )}
           <dl className="ticket-metadata">
             <div>
               <dt>Solicitante</dt>
@@ -1266,9 +1394,38 @@ function TicketDetailPage() {
               </div>
             )}
           </dl>
+          <section
+            className="ticket-history"
+            aria-label="Linha do tempo do chamado"
+          >
+            <h2>Histórico</h2>
+            <ol className="ticket-timeline">
+              {ticketTimeline(ticket).map((event) => (
+                <li key={`${event.label}-${event.at}`}>
+                  <strong>{event.label}</strong>
+                  <time dateTime={event.at}>{formatDate(event.at)}</time>
+                </li>
+              ))}
+            </ol>
+          </section>
         </article>
       )}
     </section>
+  );
+}
+
+function ticketTimeline(ticket: Ticket) {
+  const events = [
+    { label: "Chamado aberto", at: ticket.createdAt },
+    ...(ticket.resolvedAt
+      ? [{ label: "Chamado resolvido", at: ticket.resolvedAt }]
+      : []),
+    ...(ticket.closedAt
+      ? [{ label: "Chamado encerrado", at: ticket.closedAt }]
+      : []),
+  ];
+  return events.sort(
+    (left, right) => Date.parse(left.at) - Date.parse(right.at),
   );
 }
 
