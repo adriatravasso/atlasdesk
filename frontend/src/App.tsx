@@ -17,6 +17,7 @@ import {
   type Asset,
   type AssetPage,
   type AssetStatus,
+  type DashboardMetrics,
   type OrganizationSettings,
   type Ticket,
   type TicketCommand,
@@ -40,7 +41,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedLayout />}>
-            <Route index element={<OverviewPage />} />
+            <Route index element={<DashboardPage />} />
             <Route path="tickets" element={<TicketsPage />} />
             <Route path="tickets/new" element={<TicketCreatePage />} />
             <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
@@ -204,29 +205,209 @@ function Shell({
   );
 }
 
-function OverviewPage() {
+function DashboardPage() {
   const { user } = useAuth();
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    request<DashboardMetrics>("/dashboard")
+      .then((result) => {
+        if (active) setMetrics(result);
+      })
+      .catch((cause: unknown) => {
+        if (active)
+          setError(
+            cause instanceof ApiError
+              ? cause.detail
+              : "Não foi possível carregar os indicadores. Tente novamente.",
+          );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  const isRequester = user?.role === "REQUESTER";
+  const cards = metrics
+    ? [
+        {
+          label: "Total de chamados",
+          value: metrics.totalTickets,
+          href: "/tickets",
+          tone: "total",
+        },
+        {
+          label: "Abertos",
+          value: metrics.openTickets,
+          href: "/tickets?status=OPEN",
+          tone: "open",
+        },
+        {
+          label: "Em andamento",
+          value: metrics.inProgressTickets,
+          href: "/tickets?status=IN_PROGRESS",
+          tone: "progress",
+        },
+        {
+          label: "Aguardando aprovação",
+          value: metrics.pendingApprovalTickets,
+          href: "/tickets?status=PENDING_APPROVAL",
+          tone: "pending",
+        },
+        {
+          label: "Atrasados",
+          value: metrics.overdueTickets,
+          tone: "overdue",
+        },
+        {
+          label: "Resolvidos",
+          value: metrics.resolvedTickets,
+          href: "/tickets?status=RESOLVED",
+          tone: "resolved",
+        },
+        {
+          label: "Encerrados",
+          value: metrics.closedTickets,
+          href: "/tickets?status=CLOSED",
+          tone: "closed",
+        },
+        {
+          label: "Ativos cadastrados",
+          value: metrics.activeAssets,
+          href: "/assets",
+          tone: "assets",
+        },
+      ]
+    : [];
+  const priorityBars = metrics
+    ? [
+        {
+          label: "Alta",
+          value: metrics.priorityDistribution.high,
+          tone: "high",
+        },
+        {
+          label: "Média",
+          value: metrics.priorityDistribution.medium,
+          tone: "medium",
+        },
+        {
+          label: "Baixa",
+          value: metrics.priorityDistribution.low,
+          tone: "low",
+        },
+      ]
+    : [];
+
   return (
-    <section className="page-content">
-      <p className="eyebrow">VISÃO GERAL</p>
-      <h1>Olá, {user?.name.split(" ")[0]}.</h1>
-      <p className="page-lead">Este é o seu espaço de trabalho no AtlasDesk.</p>
-      <div className="welcome-card">
-        <div className="card-icon" aria-hidden="true">
-          ✓
-        </div>
-        <div>
-          <h2>Tudo pronto para começar</h2>
-          <p>
-            As funcionalidades disponíveis aparecerão aqui quando estiverem
-            habilitadas para sua equipe.
-          </p>
-        </div>
-      </div>
-      <p className="quiet-note">
-        Sua sessão é protegida e será encerrada quando você sair ou quando
-        expirar.
+    <section className="page-content dashboard-page">
+      <p className="eyebrow">
+        {isRequester ? "VISÃO DO SOLICITANTE" : "PAINEL OPERACIONAL"}
       </p>
+      <h1>{isRequester ? "Seus chamados" : "Visão da organização"}</h1>
+      <p className="page-lead">
+        {isRequester
+          ? "Acompanhe os chamados que você abriu e os prazos de atendimento."
+          : "Acompanhe o volume, o andamento e os prazos dos chamados."}
+      </p>
+      <p className="dashboard-scope">
+        {isRequester
+          ? "Os indicadores de chamados mostram apenas suas solicitações."
+          : "Indicadores atualizados a partir dos dados da sua organização."}
+      </p>
+      {error && (
+        <div className="notice notice--error" role="alert">
+          {error}{" "}
+          <button
+            className="text-button"
+            onClick={() => setReloadToken((token) => token + 1)}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+      {loading && <p role="status">Carregando indicadores…</p>}
+      {metrics && !error && (
+        <>
+          {metrics.totalTickets === 0 && (
+            <p className="dashboard-empty" role="status">
+              Ainda não há chamados para exibir nesta visão.
+            </p>
+          )}
+          <div className="dashboard-metrics" aria-label="Indicadores">
+            {cards.map((card) => (
+              <article
+                className={`dashboard-card dashboard-card--${card.tone}`}
+                key={card.tone}
+              >
+                {card.href ? (
+                  <Link to={card.href}>{card.label}</Link>
+                ) : (
+                  <span>{card.label}</span>
+                )}
+                <strong>{card.value.toLocaleString("pt-BR")}</strong>
+              </article>
+            ))}
+          </div>
+          <section
+            className="dashboard-priorities"
+            aria-labelledby="dashboard-priorities-title"
+          >
+            <div className="dashboard-panel-heading">
+              <div>
+                <p className="eyebrow">CHAMADOS POR PRIORIDADE</p>
+                <h2 id="dashboard-priorities-title">
+                  Distribuição de prioridade
+                </h2>
+              </div>
+              <span>
+                {metrics.totalTickets.toLocaleString("pt-BR")} no total
+              </span>
+            </div>
+            {metrics.totalTickets === 0 ? (
+              <p className="empty-state">
+                A distribuição aparecerá quando houver chamados.
+              </p>
+            ) : (
+              <div className="priority-bars">
+                {priorityBars.map((bar) => {
+                  const percent = (bar.value / metrics.totalTickets) * 100;
+                  return (
+                    <div className="priority-bar-row" key={bar.tone}>
+                      <div className="priority-bar-copy">
+                        <span>{bar.label}</span>
+                        <strong>{bar.value.toLocaleString("pt-BR")}</strong>
+                      </div>
+                      <div
+                        className="priority-bar-track"
+                        role="progressbar"
+                        aria-label={`Prioridade ${bar.label.toLowerCase()}`}
+                        aria-valuemin={0}
+                        aria-valuemax={metrics.totalTickets}
+                        aria-valuenow={bar.value}
+                      >
+                        <span
+                          className={`priority-bar-fill priority-bar-fill--${bar.tone}`}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </section>
   );
 }

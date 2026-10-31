@@ -305,6 +305,162 @@ input:focus-visible {
   font-size: 13px;
   line-height: 1.7;
 }
+.dashboard-page {
+  max-width: 1100px;
+}
+.dashboard-scope {
+  width: fit-content;
+  max-width: 100%;
+  margin: -12px 0 22px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: #edf3fa;
+  color: #456384;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.dashboard-empty {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #e3e9f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #66758a;
+  font-size: 12px;
+}
+.dashboard-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px;
+}
+.dashboard-card {
+  display: grid;
+  min-width: 0;
+  min-height: 112px;
+  align-content: space-between;
+  gap: 14px;
+  padding: 17px 18px;
+  border: 1px solid #e4e9ef;
+  border-top: 3px solid #6688af;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 4px 16px #293b5608;
+}
+.dashboard-card > span,
+.dashboard-card > a {
+  color: #66758a;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.dashboard-card > a:hover {
+  color: #264a76;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.dashboard-card > strong {
+  color: #1d2a40;
+  font-family: Manrope, sans-serif;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1;
+}
+.dashboard-card--total {
+  border-top-color: #355d8c;
+}
+.dashboard-card--open {
+  border-top-color: #597db0;
+}
+.dashboard-card--progress {
+  border-top-color: #4381a5;
+}
+.dashboard-card--pending {
+  border-top-color: #b17c2e;
+}
+.dashboard-card--overdue {
+  border-top-color: #b54c49;
+}
+.dashboard-card--resolved,
+.dashboard-card--closed {
+  border-top-color: #39845f;
+}
+.dashboard-card--assets {
+  border-top-color: #7467a5;
+}
+.dashboard-priorities {
+  margin-top: 20px;
+  padding: 21px 22px 23px;
+  border: 1px solid #e4e9ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 5px 20px #293b5608;
+}
+.dashboard-panel-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 21px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line);
+}
+.dashboard-panel-heading .eyebrow {
+  margin-bottom: 6px;
+}
+.dashboard-panel-heading h2 {
+  margin: 0;
+  color: #30435e;
+  font-family: Manrope, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+.dashboard-panel-heading > span {
+  flex: none;
+  color: #7b8798;
+  font-size: 11px;
+}
+.priority-bars {
+  display: grid;
+  gap: 17px;
+}
+.priority-bar-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+.priority-bar-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #586980;
+  font-size: 12px;
+}
+.priority-bar-copy strong {
+  color: #30435e;
+  font-size: 12px;
+}
+.priority-bar-track {
+  height: 11px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #edf1f5;
+}
+.priority-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+.priority-bar-fill--high {
+  background: #b54c49;
+}
+.priority-bar-fill--medium {
+  background: #b17c2e;
+}
+.priority-bar-fill--low {
+  background: #4b7eaa;
+}
 .quiet-note {
   margin: 19px 0;
   color: #99a3b1;
@@ -483,6 +639,14 @@ tbody tr:last-child td {
   .content {
     padding-top: 38px;
   }
+  .dashboard-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 680px) {
+  .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 600px) {
   .sidebar {
@@ -522,6 +686,37 @@ tbody tr:last-child td {
   }
   .welcome-card {
     padding: 20px 17px;
+  }
+  .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .dashboard-card {
+    min-height: 104px;
+    padding: 14px 13px;
+  }
+  .dashboard-card > strong {
+    font-size: 24px;
+  }
+  .dashboard-priorities {
+    padding: 17px 14px 19px;
+  }
+  .dashboard-panel-heading {
+    align-items: flex-start;
+  }
+  .dashboard-panel-heading h2 {
+    font-size: 14px;
+  }
+  .dashboard-panel-heading > span {
+    padding-top: 1px;
+    font-size: 10px;
+  }
+  .priority-bar-row {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .priority-bar-copy {
+    font-size: 11px;
   }
   .mobile-nav {
     position: fixed;

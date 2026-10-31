@@ -214,6 +214,22 @@ export type TicketPage = {
   totalPages: number;
 };
 
+export type DashboardMetrics = {
+  totalTickets: number;
+  openTickets: number;
+  inProgressTickets: number;
+  pendingApprovalTickets: number;
+  resolvedTickets: number;
+  closedTickets: number;
+  overdueTickets: number;
+  priorityDistribution: {
+    low: number;
+    medium: number;
+    high: number;
+  };
+  activeAssets: number;
+};
+
 export type OrganizationSettings = {
   slaLowHours: number;
   slaMediumHours: number;
