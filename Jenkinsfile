@@ -50,7 +50,7 @@ pipeline {
 
         stage('Frontend lint, typecheck and build') {
             steps {
-                sh 'docker compose --profile e2e run --rm --no-deps e2e-frontend sh -c "npm ci --prefer-offline && npm run lint && npm run typecheck && npm run build"'
+                sh 'docker compose --profile e2e run --rm --no-deps e2e-frontend sh -c "npm ci --prefer-offline && npm run lint && npm run typecheck && npm run format:check && npm run test:proxy && npm run build"'
             }
         }
 

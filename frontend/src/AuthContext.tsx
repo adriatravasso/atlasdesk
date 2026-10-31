@@ -8,6 +8,7 @@ import {
   type SessionUser,
 } from "./api";
 import { AuthContext, type AuthState } from "./auth-context";
+import { backendReadyEvent } from "./backend-status-context";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setCurrentUser] = useState<SessionUser | null>(null);
@@ -23,6 +24,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError("Sua sessão expirou. Entre novamente para continuar.");
       }
     });
+    const refreshSession = () => {
+      resetSessionCache();
+      getCurrentUser()
+        .then((profile) => {
+          if (active) {
+            setCurrentUser(profile);
+            setError(null);
+          }
+        })
+        .catch((cause: unknown) => {
+          if (active && cause instanceof ApiError && cause.status === 401) {
+            setCurrentUser(null);
+          } else if (active) {
+            setError("Não foi possível verificar sua sessão. Tente novamente.");
+          }
+        });
+    };
+    window.addEventListener(backendReadyEvent, refreshSession);
     getCurrentUser()
       .then((profile) => {
         if (active) setCurrentUser(profile);
@@ -38,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
       unsubscribe();
+      window.removeEventListener(backendReadyEvent, refreshSession);
     };
   }, []);
 

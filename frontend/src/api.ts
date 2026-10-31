@@ -24,18 +24,36 @@ export class ApiError extends Error {
 let csrfRequest: Promise<CsrfResponse> | undefined;
 let currentUserRequest: Promise<SessionUser> | undefined;
 const unauthorizedEvent = new Event("atlasdesk:unauthorized");
+const UNAVAILABLE_EVENT = "atlasdesk:backend-unavailable";
+
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8_000);
+  try {
+    const response = await fetch(input, { ...init, signal: controller.signal });
+    if (response.status >= 502) {
+      window.dispatchEvent(new Event(UNAVAILABLE_EVENT));
+    }
+    return response;
+  } catch (error) {
+    window.dispatchEvent(new Event(UNAVAILABLE_EVENT));
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 function clearCsrf() {
   csrfRequest = undefined;
 }
 
 async function csrf(): Promise<CsrfResponse> {
-  csrfRequest ??= fetch("/api/auth/csrf", { credentials: "same-origin" }).then(
-    async (response) => {
-      if (!response.ok) throw await toApiError(response);
-      return (await response.json()) as CsrfResponse;
-    },
-  );
+  csrfRequest ??= apiFetch("/api/auth/csrf", {
+    credentials: "same-origin",
+  }).then(async (response) => {
+    if (!response.ok) throw await toApiError(response);
+    return (await response.json()) as CsrfResponse;
+  });
   try {
     return await csrfRequest;
   } catch (error) {
@@ -75,7 +93,7 @@ export async function request<T>(
     headers.set(token.headerName, token.token);
   }
 
-  const response = await fetch(`/api${path}`, {
+  const response = await apiFetch(`/api${path}`, {
     ...init,
     method,
     headers,
