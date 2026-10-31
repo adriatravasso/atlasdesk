@@ -87,6 +87,7 @@ services:
       CYPRESS_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
       CYPRESS_ADMIN_ORGANIZATION_ID: ${DEV_ADMIN_ORGANIZATION_ID:-1}
       CYPRESS_E2E_USER_EMAIL: ${ATL0008_E2E_USER_EMAIL:-}
+      CYPRESS_E2E_ASSET_NUMBER: ${ATL0010_E2E_ASSET_NUMBER:-}
     volumes:
       - ./tests/e2e:/e2e
       - e2e_node_modules:/e2e/node_modules

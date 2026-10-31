@@ -689,6 +689,61 @@ tbody tr:last-child td {
   cursor: default;
   opacity: 0.5;
 }
+.asset-filters {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 16px;
+  border: 1px solid #e4e9ef;
+  border-radius: 9px;
+  background: #fff;
+}
+.asset-filters label {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  color: #44546a;
+  font-size: 11px;
+  font-weight: 700;
+}
+.asset-filters input,
+.asset-filters select,
+.user-form-grid textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid #dce2e9;
+  border-radius: 6px;
+  background: #fff;
+  color: #25364e;
+  font: inherit;
+}
+.asset-filters input::placeholder {
+  color: #a1aab6;
+  font-weight: 400;
+}
+.user-form-grid .asset-description-field {
+  grid-column: 1 / -1;
+}
+.user-form-grid textarea {
+  resize: vertical;
+}
+@media (max-width: 600px) {
+  .asset-filters {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 11px;
+    padding: 14px;
+  }
+  .asset-filters > .button {
+    min-height: 38px;
+  }
+  .user-form-grid .asset-description-field {
+    grid-column: auto;
+  }
+}
 @media (max-width: 600px) {
   .users-title-row {
     align-items: flex-start;

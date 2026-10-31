@@ -42,9 +42,9 @@ The Compose backend explicitly activates the `dev` Spring profile by default, wh
 
 ## Authentication
 
-The React app provides a protected session shell, login, overview, and ADMIN-only user directory. It uses the Fetch API with the HttpOnly session cookie; mutating requests first obtain CSRF and send its token in the named header. Login JSON contains `organizationId`, `email`, and `password`. `GET /api/auth/me` restores a session after reload. Do not store passwords or session identifiers in browser storage. `SESSION_COOKIE_SECURE` defaults to `false` for local HTTP; set it to `true` when serving the application over HTTPS.
+The React app provides a protected session shell, login, overview, asset directory, and ADMIN-only user directory. The asset directory is available to all roles; ADMIN and AGENT can create, edit, inactivate, and reactivate assets, while REQUESTER sees only active assets and the number, name, and type needed to choose one for a ticket. It uses the Fetch API with the HttpOnly session cookie; mutating requests first obtain CSRF and send its token in the named header. Login JSON contains `organizationId`, `email`, and `password`. `GET /api/auth/me` restores a session after reload. Do not store passwords or session identifiers in browser storage. `SESSION_COOKIE_SECURE` defaults to `false` for local HTTP; set it to `true` when serving the application over HTTPS.
 
-For a local authenticated smoke test, set a development password in `.env` (use at least 12 characters) and restart the backend. The seeded `AtlasDesk Local` organization is normally ID `1`; confirm it with `docker compose exec db psql -U atlasdesk -d atlasdesk -c "select id, name from organizations;"`. Set `DEV_ADMIN_ORGANIZATION_ID` to that ID in `.env`. The Cypress profile reads the same email, organization ID, and password. To also exercise user create/edit/deactivate, set `ATL0008_E2E_USER_EMAIL` to a new, unique local email; the test leaves that account inactive in the local database. Then run:
+For a local authenticated smoke test, set a development password in `.env` (use at least 12 characters) and restart the backend. The seeded `AtlasDesk Local` organization is normally ID `1`; confirm it with `docker compose exec db psql -U atlasdesk -d atlasdesk -c "select id, name from organizations;"`. Set `DEV_ADMIN_ORGANIZATION_ID` to that ID in `.env`. The Cypress profile reads the same email, organization ID, and password. Optional user and asset flows require `ATL0008_E2E_USER_EMAIL` and `ATL0010_E2E_ASSET_NUMBER` to contain new, unique test values; Cypress creates and updates the asset, then leaves it inactive in the local database. Then run:
 
 ```powershell
 docker compose up -d --build db backend frontend
@@ -103,11 +103,11 @@ This stops and removes the containers while preserving named volumes and local d
 - PostgreSQL datasource configuration and Flyway integration.
 - A web MVC test for the health endpoint.
 - Organization-scoped asset API with paginated filters, ADMIN/AGENT writes, and PostgreSQL uniqueness for asset numbers.
-- React authenticated shell, session restoration, login/logout, role-protected user directory, and Vite API proxy.
+- React authenticated shell, session restoration, login/logout, role-protected user directory, role-aware asset inventory UI, and Vite API proxy.
 - PostgreSQL 16, backend, and frontend Compose services with health checks, service dependencies, bind mounts, and persistent caches.
 - Production image stages for the backend and frontend Dockerfiles.
 - Cypress E2E smoke test and isolated dependency lockfile under `tests/e2e`, run in an opt-in Compose profile.
 
 ## Planned
 
-Support tickets, asset management UI, configurable SLAs, optional resolution approval, operational dashboards, broader end-to-end coverage, and Jenkins CI are planned for later tasks.
+Support tickets, configurable SLAs, optional resolution approval, operational dashboards, broader end-to-end coverage, and Jenkins CI are planned for later tasks.

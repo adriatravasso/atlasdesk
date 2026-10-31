@@ -12,6 +12,9 @@ import {
 } from "react-router-dom";
 import {
   ApiError,
+  type Asset,
+  type AssetPage,
+  type AssetStatus,
   login,
   request,
   type SessionUser,
@@ -29,6 +32,14 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedLayout />}>
             <Route index element={<OverviewPage />} />
+            <Route
+              path="assets"
+              element={
+                <RoleRoute roles={["ADMIN", "AGENT", "REQUESTER"]}>
+                  <AssetsPage />
+                </RoleRoute>
+              }
+            />
             <Route
               path="users"
               element={
@@ -112,6 +123,7 @@ function Shell({
           <NavLink to="/" end>
             Visão geral
           </NavLink>
+          <NavLink to="/assets">Ativos</NavLink>
           {user.role === "ADMIN" && <NavLink to="/users">Usuários</NavLink>}
         </nav>
         <div className="sidebar-foot">
@@ -158,6 +170,7 @@ function Shell({
           <NavLink to="/" end>
             Início
           </NavLink>
+          <NavLink to="/assets">Ativos</NavLink>
           {user.role === "ADMIN" && <NavLink to="/users">Usuários</NavLink>}
         </nav>
       </div>
@@ -698,6 +711,477 @@ function UsersPage() {
           <div className="pagination" aria-label="Paginação de usuários">
             <span>
               Página {visiblePage} de {Math.max(totalPages, 1)}
+            </span>
+            <div>
+              <button
+                className="button button--quiet"
+                onClick={() => setPageNumber((value) => Math.max(0, value - 1))}
+                disabled={loading || pageNumber === 0 || totalPages === 0}
+              >
+                Anterior
+              </button>
+              <button
+                className="button button--quiet"
+                onClick={() => setPageNumber((value) => value + 1)}
+                disabled={loading || pageNumber + 1 >= totalPages}
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AssetsPage() {
+  const { user } = useAuth();
+  const canManage = user?.role === "ADMIN" || user?.role === "AGENT";
+  const [page, setPage] = useState<AssetPage | null>(null);
+  const [pageNumber, setPageNumber] = useState(0);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [filters, setFilters] = useState({
+    search: "",
+    type: "",
+    status: "ACTIVE" as AssetStatus,
+  });
+  const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Asset | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [busyAssetId, setBusyAssetId] = useState<number | null>(null);
+  const [form, setForm] = useState({
+    assetNumber: "",
+    name: "",
+    type: "",
+    description: "",
+    status: "ACTIVE" as AssetStatus,
+  });
+
+  useEffect(() => {
+    let active = true;
+    const query = new URLSearchParams({ page: String(pageNumber), size: "20" });
+    if (filters.search) query.set("search", filters.search);
+    if (filters.type) query.set("type", filters.type);
+    query.set("status", canManage ? filters.status : "ACTIVE");
+    setLoading(true);
+    setListError(null);
+    request<AssetPage>(`/assets?${query.toString()}`)
+      .then((result) => {
+        if (active) setPage(result);
+      })
+      .catch((cause: unknown) => {
+        if (active) {
+          setListError(
+            cause instanceof ApiError
+              ? cause.status === 403
+                ? "Sua conta não tem acesso aos ativos desta organização."
+                : cause.detail
+              : "Não foi possível carregar os ativos. Tente novamente.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [canManage, filters, pageNumber, reloadToken]);
+
+  function openCreate() {
+    setEditing(null);
+    setForm({
+      assetNumber: "",
+      name: "",
+      type: "",
+      description: "",
+      status: "ACTIVE",
+    });
+    setFormError(null);
+    setFormOpen(true);
+    setNotice(null);
+  }
+
+  function openEdit(asset: Asset) {
+    setEditing(asset);
+    setForm({
+      assetNumber: asset.assetNumber,
+      name: asset.name,
+      type: asset.type,
+      description: asset.description ?? "",
+      status: asset.status,
+    });
+    setFormError(null);
+    setFormOpen(true);
+    setNotice(null);
+  }
+
+  async function saveAsset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+    const input = {
+      assetNumber: form.assetNumber.trim(),
+      name: form.name.trim(),
+      type: form.type.trim(),
+      description: form.description.trim(),
+      status: form.status,
+    };
+    if (!input.assetNumber || !input.name || !input.type) {
+      setFormError("Informe patrimônio, nome e tipo do ativo.");
+      return;
+    }
+    if (
+      editing?.status === "ACTIVE" &&
+      input.status === "INACTIVE" &&
+      !window.confirm(`Deseja inativar o ativo ${editing.assetNumber}?`)
+    )
+      return;
+    setSaving(true);
+    try {
+      await request(editing ? `/assets/${editing.id}` : "/assets", {
+        method: editing ? "PATCH" : "POST",
+        body: JSON.stringify(input),
+      });
+      setNotice(
+        editing
+          ? "As alterações do ativo foram salvas."
+          : "O ativo foi cadastrado.",
+      );
+      setFormOpen(false);
+      setEditing(null);
+      setPageNumber(0);
+      setReloadToken((token) => token + 1);
+    } catch (cause) {
+      setFormError(
+        cause instanceof ApiError
+          ? cause.status === 409
+            ? "Já existe um ativo com esse patrimônio nesta organização."
+            : cause.detail
+          : "Não foi possível salvar o ativo. Tente novamente.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleAsset(asset: Asset) {
+    const deactivate = asset.status === "ACTIVE";
+    if (
+      deactivate &&
+      !window.confirm(`Deseja inativar o ativo ${asset.assetNumber}?`)
+    )
+      return;
+    setNotice(null);
+    setBusyAssetId(asset.id);
+    try {
+      await request(`/assets/${asset.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: deactivate ? "INACTIVE" : "ACTIVE" }),
+      });
+      setNotice(
+        deactivate
+          ? `O ativo ${asset.assetNumber} foi inativado.`
+          : `O ativo ${asset.assetNumber} foi reativado.`,
+      );
+      setReloadToken((token) => token + 1);
+    } catch (cause) {
+      setNotice(
+        cause instanceof ApiError
+          ? cause.detail
+          : "Não foi possível atualizar o ativo.",
+      );
+    } finally {
+      setBusyAssetId(null);
+    }
+  }
+
+  const totalPages = page?.totalPages ?? 0;
+  return (
+    <section className="page-content">
+      <div className="users-title-row">
+        <div>
+          <p className="eyebrow">INVENTÁRIO</p>
+          <h1>Ativos</h1>
+          <p className="page-lead">
+            {canManage
+              ? "Consulte e mantenha os ativos da sua organização."
+              : "Ativos disponíveis para associar a um chamado."}
+          </p>
+        </div>
+        {canManage && (
+          <button className="button button--primary" onClick={openCreate}>
+            Novo ativo
+          </button>
+        )}
+      </div>
+      {notice && (
+        <div className="notice notice--success" role="status">
+          {notice}
+        </div>
+      )}
+      {canManage && formOpen && (
+        <form className="user-form-card" onSubmit={saveAsset}>
+          <div className="user-form-heading">
+            <div>
+              <p className="eyebrow">INVENTÁRIO</p>
+              <h2>{editing ? "Editar ativo" : "Cadastrar ativo"}</h2>
+            </div>
+            <button
+              className="button button--quiet"
+              type="button"
+              onClick={() => setFormOpen(false)}
+              aria-label="Fechar formulário"
+            >
+              Fechar
+            </button>
+          </div>
+          {formError && (
+            <div className="notice notice--error" role="alert">
+              {formError}
+            </div>
+          )}
+          <div className="user-form-grid">
+            <label>
+              Número patrimonial
+              <input
+                name="assetNumber"
+                value={form.assetNumber}
+                maxLength={80}
+                onChange={(event) =>
+                  setForm({ ...form, assetNumber: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Nome
+              <input
+                name="name"
+                value={form.name}
+                maxLength={160}
+                onChange={(event) =>
+                  setForm({ ...form, name: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Tipo
+              <input
+                name="type"
+                value={form.type}
+                maxLength={80}
+                onChange={(event) =>
+                  setForm({ ...form, type: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Estado
+              <select
+                name="status"
+                value={form.status}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    status: event.target.value as AssetStatus,
+                  })
+                }
+              >
+                <option value="ACTIVE">Ativo</option>
+                <option value="INACTIVE">Inativo</option>
+              </select>
+            </label>
+            <label className="asset-description-field">
+              Descrição
+              <textarea
+                name="description"
+                value={form.description}
+                maxLength={2000}
+                rows={3}
+                onChange={(event) =>
+                  setForm({ ...form, description: event.target.value })
+                }
+              />
+            </label>
+          </div>
+          <div className="user-form-actions">
+            <button
+              className="button button--quiet"
+              type="button"
+              onClick={() => setFormOpen(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </button>
+            <button
+              className="button button--primary"
+              type="submit"
+              disabled={saving}
+            >
+              {saving
+                ? "Salvando…"
+                : editing
+                  ? "Salvar alterações"
+                  : "Cadastrar"}
+            </button>
+          </div>
+        </form>
+      )}
+      <form
+        className="asset-filters"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setPageNumber(0);
+          setFilters({ ...filters, search: searchInput.trim() });
+        }}
+      >
+        <label>
+          Buscar ativo
+          <input
+            aria-label="Buscar ativo"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Patrimônio ou nome"
+          />
+        </label>
+        <label>
+          Tipo
+          <input
+            aria-label="Filtrar por tipo"
+            value={filters.type}
+            onChange={(event) => {
+              setPageNumber(0);
+              setFilters({ ...filters, type: event.target.value.trim() });
+            }}
+            placeholder="Todos os tipos"
+          />
+        </label>
+        {canManage && (
+          <label>
+            Estado
+            <select
+              aria-label="Filtrar por estado"
+              value={filters.status}
+              onChange={(event) => {
+                setPageNumber(0);
+                setFilters({
+                  ...filters,
+                  status: event.target.value as AssetStatus,
+                });
+              }}
+            >
+              <option value="ACTIVE">Ativos</option>
+              <option value="INACTIVE">Inativos</option>
+            </select>
+          </label>
+        )}
+        <button className="button button--quiet" type="submit">
+          Buscar
+        </button>
+      </form>
+      {loading && <p role="status">Carregando ativos…</p>}
+      {listError && (
+        <div className="notice notice--error" role="alert">
+          {listError}{" "}
+          <button
+            className="text-button"
+            onClick={() => setReloadToken((token) => token + 1)}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+      {page && (
+        <div className="table-card">
+          <div className="table-heading">
+            <h2>
+              {canManage ? "Inventário da organização" : "Ativos disponíveis"}
+            </h2>
+            <span>
+              {page.totalElements}{" "}
+              {page.totalElements === 1 ? "ativo" : "ativos"}
+            </span>
+          </div>
+          {page.content.length === 0 ? (
+            <p className="empty-state">
+              {filters.search || filters.type || filters.status
+                ? "Nenhum ativo corresponde aos filtros."
+                : canManage
+                  ? "Ainda não há ativos nesta organização."
+                  : "Nenhum ativo ativo está disponível no momento."}
+            </p>
+          ) : (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Número patrimonial</th>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    {canManage && (
+                      <>
+                        <th>Estado</th>
+                        <th>Ações</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {page.content.map((asset) => (
+                    <tr key={asset.id}>
+                      <td>{asset.assetNumber}</td>
+                      <td>{asset.name}</td>
+                      <td>{asset.type}</td>
+                      {canManage && (
+                        <>
+                          <td>
+                            <span
+                              className={`status-tag ${asset.status === "ACTIVE" ? "status-tag--active" : ""}`}
+                            >
+                              {asset.status === "ACTIVE" ? "Ativo" : "Inativo"}
+                            </span>
+                          </td>
+                          <td className="user-row-actions">
+                            <div>
+                              <button
+                                className="text-button"
+                                onClick={() => openEdit(asset)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                className={`text-button ${asset.status === "ACTIVE" ? "text-button--danger" : ""}`}
+                                onClick={() => void toggleAsset(asset)}
+                                disabled={busyAssetId === asset.id}
+                              >
+                                {busyAssetId === asset.id
+                                  ? "Salvando…"
+                                  : asset.status === "ACTIVE"
+                                    ? "Inativar"
+                                    : "Reativar"}
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="pagination" aria-label="Paginação de ativos">
+            <span>
+              Página {page.totalPages === 0 ? 0 : pageNumber + 1} de{" "}
+              {Math.max(totalPages, 1)}
             </span>
             <div>
               <button
