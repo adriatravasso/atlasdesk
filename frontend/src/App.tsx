@@ -321,21 +321,41 @@ function LoginPage() {
 
 function UsersPage() {
   const [page, setPage] = useState<UserPage | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [pageNumber, setPageNumber] = useState(0);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [listError, setListError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [busyUserId, setBusyUserId] = useState<number | null>(null);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    role: "REQUESTER" as UserRole,
+    active: true,
+    password: "",
+  });
   useEffect(() => {
     let active = true;
-    request<UserPage>("/users?page=0&size=20")
+    setLoading(true);
+    setListError(null);
+    request<UserPage>(`/users?page=${pageNumber}&size=20`)
       .then((result) => {
         if (active) setPage(result);
       })
       .catch((cause: unknown) => {
-        if (active)
-          setError(
-            cause instanceof ApiError && cause.status === 403
-              ? "Sua conta não tem acesso à administração de usuários."
-              : "Não foi possível carregar os usuários.",
+        if (active) {
+          setListError(
+            cause instanceof ApiError
+              ? cause.status === 403
+                ? "Sua conta não tem acesso à administração de usuários."
+                : cause.detail
+              : "Não foi possível carregar os usuários. Tente novamente.",
           );
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -343,16 +363,271 @@ function UsersPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [pageNumber, reloadToken]);
+
+  function startCreate() {
+    setEditingId(null);
+    setForm({
+      name: "",
+      email: "",
+      role: "REQUESTER",
+      active: true,
+      password: "",
+    });
+    setFormError(null);
+    setNotice(null);
+    setFormOpen(true);
+  }
+
+  function startEdit(person: UserPage["content"][number]) {
+    setEditingId(person.id);
+    setForm({
+      name: person.name,
+      email: person.email,
+      role: person.role,
+      active: person.active,
+      password: "",
+    });
+    setFormError(null);
+    setNotice(null);
+    setFormOpen(true);
+  }
+
+  function closeForm() {
+    setFormOpen(false);
+    setFormError(null);
+  }
+
+  async function saveUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+    if (!form.name.trim() || form.name.trim().length > 160) {
+      setFormError("Informe um nome com até 160 caracteres.");
+      return;
+    }
+    if (!form.email.trim() || form.email.trim().length > 320) {
+      setFormError("Informe um e-mail válido com até 320 caracteres.");
+      return;
+    }
+    if (
+      (!editingId && form.password.length < 12) ||
+      form.password.length > 72
+    ) {
+      setFormError(
+        editingId
+          ? "A nova senha deve ter entre 12 e 72 caracteres."
+          : "A senha deve ter entre 12 e 72 caracteres.",
+      );
+      return;
+    }
+    setSaving(true);
+    try {
+      const input = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        role: form.role,
+        active: form.active,
+        ...(form.password ? { password: form.password } : {}),
+      };
+      if (editingId) {
+        await request(`/users/${editingId}`, {
+          method: "PATCH",
+          body: JSON.stringify(input),
+        });
+        setNotice("As alterações do usuário foram salvas.");
+      } else {
+        await request("/users", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+        setPageNumber(0);
+        setNotice("O usuário foi cadastrado.");
+      }
+      setFormOpen(false);
+      setEditingId(null);
+      setReloadToken((token) => token + 1);
+    } catch (cause) {
+      setFormError(
+        cause instanceof ApiError
+          ? cause.detail
+          : "Não foi possível salvar o usuário. Tente novamente.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleUser(person: UserPage["content"][number]) {
+    if (
+      person.active &&
+      !window.confirm(`Deseja desativar a conta de ${person.name}?`)
+    ) {
+      return;
+    }
+    setNotice(null);
+    setBusyUserId(person.id);
+    try {
+      await request(`/users/${person.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ active: !person.active }),
+      });
+      setNotice(
+        person.active
+          ? `A conta de ${person.name} foi desativada.`
+          : `A conta de ${person.name} foi reativada.`,
+      );
+      setReloadToken((token) => token + 1);
+    } catch (cause) {
+      setNotice(
+        cause instanceof ApiError
+          ? cause.detail
+          : "Não foi possível atualizar o estado do usuário.",
+      );
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  const totalPages = page?.totalPages ?? 0;
+  const visiblePage = totalPages === 0 ? 0 : pageNumber + 1;
   return (
     <section className="page-content">
-      <p className="eyebrow">ADMINISTRAÇÃO</p>
-      <h1>Usuários</h1>
-      <p className="page-lead">Pessoas cadastradas na sua organização.</p>
+      <div className="users-title-row">
+        <div>
+          <p className="eyebrow">ADMINISTRAÇÃO</p>
+          <h1>Usuários</h1>
+          <p className="page-lead">Gerencie as contas da sua organização.</p>
+        </div>
+        <button className="button button--primary" onClick={startCreate}>
+          Novo usuário
+        </button>
+      </div>
+      {notice && (
+        <div className="notice notice--success" role="status">
+          {notice}
+        </div>
+      )}
+      {formOpen && (
+        <form className="user-form-card" onSubmit={saveUser}>
+          <div className="user-form-heading">
+            <div>
+              <p className="eyebrow">CONTA</p>
+              <h2>{editingId ? "Editar usuário" : "Cadastrar usuário"}</h2>
+            </div>
+            <button
+              className="button button--quiet"
+              type="button"
+              onClick={closeForm}
+              aria-label="Fechar formulário"
+            >
+              Fechar
+            </button>
+          </div>
+          {formError && (
+            <div className="notice notice--error" role="alert">
+              {formError}
+            </div>
+          )}
+          <div className="user-form-grid">
+            <label>
+              Nome
+              <input
+                name="name"
+                value={form.name}
+                maxLength={160}
+                onChange={(event) =>
+                  setForm({ ...form, name: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              E-mail
+              <input
+                name="email"
+                type="email"
+                value={form.email}
+                maxLength={320}
+                onChange={(event) =>
+                  setForm({ ...form, email: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Perfil
+              <select
+                name="role"
+                value={form.role}
+                onChange={(event) =>
+                  setForm({ ...form, role: event.target.value as UserRole })
+                }
+              >
+                <option value="ADMIN">Administrador</option>
+                <option value="AGENT">Agente</option>
+                <option value="REQUESTER">Solicitante</option>
+              </select>
+            </label>
+            <label className="user-password-field">
+              Senha {editingId ? "(opcional)" : "(mínimo 12 caracteres)"}
+              <input
+                name="password"
+                type="password"
+                value={form.password}
+                minLength={editingId ? undefined : 12}
+                maxLength={72}
+                autoComplete="new-password"
+                onChange={(event) =>
+                  setForm({ ...form, password: event.target.value })
+                }
+                required={!editingId}
+              />
+            </label>
+            <label className="user-active-field">
+              <input
+                name="active"
+                type="checkbox"
+                checked={form.active}
+                onChange={(event) =>
+                  setForm({ ...form, active: event.target.checked })
+                }
+              />
+              Conta ativa
+            </label>
+          </div>
+          <div className="user-form-actions">
+            <button
+              className="button button--quiet"
+              type="button"
+              onClick={closeForm}
+              disabled={saving}
+            >
+              Cancelar
+            </button>
+            <button
+              className="button button--primary"
+              type="submit"
+              disabled={saving}
+            >
+              {saving
+                ? "Salvando…"
+                : editingId
+                  ? "Salvar alterações"
+                  : "Cadastrar"}
+            </button>
+          </div>
+        </form>
+      )}
       {loading && <p role="status">Carregando usuários…</p>}
-      {error && (
+      {listError && (
         <div className="notice notice--error" role="alert">
-          {error}
+          <span>{listError}</span>{" "}
+          <button
+            className="text-button"
+            onClick={() => setReloadToken((token) => token + 1)}
+          >
+            Tentar novamente
+          </button>
         </div>
       )}
       {page && (
@@ -361,12 +636,12 @@ function UsersPage() {
             <h2>Diretório</h2>
             <span>
               {page.totalElements}{" "}
-              {page.totalElements === 1 ? "pessoa" : "pessoas"}
+              {page.totalElements === 1 ? "conta" : "contas"}
             </span>
           </div>
           {page.content.length === 0 ? (
             <p className="empty-state">
-              Ainda não há usuários cadastrados nesta organização.
+              Ainda não há usuários nesta organização.
             </p>
           ) : (
             <div className="table-scroll">
@@ -377,6 +652,7 @@ function UsersPage() {
                     <th>E-mail</th>
                     <th>Perfil</th>
                     <th>Estado</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -392,12 +668,54 @@ function UsersPage() {
                           {person.active ? "Ativo" : "Inativo"}
                         </span>
                       </td>
+                      <td className="user-row-actions">
+                        <div>
+                          <button
+                            className="text-button"
+                            onClick={() => startEdit(person)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className={`text-button ${person.active ? "text-button--danger" : ""}`}
+                            onClick={() => void toggleUser(person)}
+                            disabled={busyUserId === person.id}
+                          >
+                            {busyUserId === person.id
+                              ? "Salvando…"
+                              : person.active
+                                ? "Desativar"
+                                : "Reativar"}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+          <div className="pagination" aria-label="Paginação de usuários">
+            <span>
+              Página {visiblePage} de {Math.max(totalPages, 1)}
+            </span>
+            <div>
+              <button
+                className="button button--quiet"
+                onClick={() => setPageNumber((value) => Math.max(0, value - 1))}
+                disabled={loading || pageNumber === 0 || totalPages === 0}
+              >
+                Anterior
+              </button>
+              <button
+                className="button button--quiet"
+                onClick={() => setPageNumber((value) => value + 1)}
+                disabled={loading || pageNumber + 1 >= totalPages}
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>
