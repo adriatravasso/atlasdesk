@@ -1,0 +1,9 @@
+{
+  "organizationId": 1,
+  "otherOrganizationId": 2,
+  "password": "AtlasE2E!2026",
+  "admin": "admin@atlasdesk.test",
+  "agent": "agent@atlasdesk.test",
+  "requester": "requester@atlasdesk.test",
+  "otherAdmin": "admin@other-atlasdesk.test"
+}

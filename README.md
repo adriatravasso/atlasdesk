@@ -44,14 +44,13 @@ The Compose backend explicitly activates the `dev` Spring profile by default, wh
 
 The React app provides a protected session shell, login, overview, ticket list/create/detail pages, asset directory, and ADMIN-only user and organization settings pages. Every role can open and follow tickets; the API restricts REQUESTER accounts to their own tickets. The asset directory is available to all roles; ADMIN and AGENT can create, edit, inactivate, and reactivate assets, while REQUESTER sees only active assets and the number, name, and type needed to choose one for a ticket. It uses the Fetch API with the HttpOnly session cookie; mutating requests first obtain CSRF and send its token in the named header. Login JSON contains `organizationId`, `email`, and `password`. `GET /api/auth/me` restores a session after reload. Do not store passwords or session identifiers in browser storage. `SESSION_COOKIE_SECURE` defaults to `false` for local HTTP; set it to `true` when serving the application over HTTPS.
 
-For a local authenticated smoke test, set a development password in `.env` (use at least 12 characters) and restart the backend. The seeded `AtlasDesk Local` organization is normally ID `1`; confirm it with `docker compose exec db psql -U atlasdesk -d atlasdesk -c "select id, name from organizations;"`. Set `DEV_ADMIN_ORGANIZATION_ID` to that ID in `.env`. The Cypress profile reads the same email, organization ID, and password. Optional user and asset flows require `ATL0008_E2E_USER_EMAIL` and `ATL0010_E2E_ASSET_NUMBER` to contain new, unique test values. Set `ATL0012_E2E_TICKET_TITLE` to a unique title to create a ticket and verify its list entry and detail. For the ATL-0014 workflow, set `ATL0014_E2E_AGENT_EMAIL`, `ATL0014_E2E_REQUESTER_EMAIL`, and `ATL0014_E2E_TICKET_TITLE` to new, unique values; it creates active test accounts and leaves its ticket closed. The user flow leaves its account inactive and the asset flow leaves its asset inactive in the local database. Then run:
+The Cypress suite uses its own Compose services and persistent test-only PostgreSQL volume. It seeds fixed, non-production accounts and resets only that isolated database before every test. It does not use `.env`, the development database, or the optional development admin. Run the complete suite with:
 
 ```powershell
-docker compose up -d --build db backend frontend
 docker compose --profile e2e run --rm e2e
 ```
 
-Without `DEV_ADMIN_PASSWORD`, the invalid-credentials smoke check still runs and the real-session Cypress case is skipped.
+This command builds/starts the E2E-only backend, frontend, and database, then runs Cypress headlessly. Failure screenshots are written under `tests/e2e/cypress/screenshots`; Cypress video recording is disabled by default.
 
 User administration is available to ADMIN sessions at `GET /api/users?page=0&size=20`, `POST /api/users`, and `PATCH /api/users/{id}`. Create requests require `name`, `email`, `role`, and `password`; `active` defaults to `true`. PATCH accepts only supplied fields. Send the CSRF cookie and token header for POST/PATCH. User queries and changes always use the authenticated session's organization; password hashes are never returned, and the last active ADMIN cannot be deactivated or demoted.
 
@@ -93,7 +92,7 @@ docker compose exec frontend npm run format:check
 docker compose exec frontend npm run build
 ```
 
-Run the Cypress browser smoke test on demand. Compose starts its dependent services and removes the one-off test container when it exits. The config, spec, package manifest, and lockfile live in `tests/e2e`:
+Run the complete Cypress suite on demand. Compose starts its isolated test database, backend, and frontend; the default development services and data are not used:
 
 ```powershell
 docker compose --profile e2e run --rm e2e
@@ -127,4 +126,4 @@ This stops and removes the containers while preserving named volumes and local d
 
 ## Planned
 
-Optional resolution approval and operational dashboards are available. Broader end-to-end coverage and Jenkins CI remain planned for later tasks.
+Optional resolution approval and operational dashboards are available. Jenkins CI remains planned for a later task.

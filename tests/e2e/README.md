@@ -1,20 +1,21 @@
-# AtlasDesk E2E tests
+# AtlasDesk Cypress E2E
 
-The Cypress project is run in the `e2e` Docker Compose profile. It verifies invalid credentials and, when configured, real login, session reload, protected user access, ticket creation/list/detail, and the agent/requester handling flow through closure. A browser API-intercept spec also covers agent resolution requests, administrator approval/rejection, and hidden review actions for non-admin roles without modifying database records. No local Node.js, npm, or Cypress installation is needed.
-
-From the repository root, start the application and run the smoke test:
+Run the full headless suite from the repository root:
 
 ```powershell
-docker compose up -d --build db backend frontend
 docker compose --profile e2e run --rm e2e
 ```
 
-For the real-session case, set `DEV_ADMIN_PASSWORD` and `DEV_ADMIN_ORGANIZATION_ID` in `.env` as described in the root README. Cypress receives those values from Compose. Without the password, only invalid-credentials and UI-gated cases are skipped. To include the user-directory UI flow, also set `ATL0008_E2E_USER_EMAIL` to a new, unique local email; Cypress creates, edits, and deactivates that account. Set `ATL0010_E2E_ASSET_NUMBER` to a new, unique local asset number to exercise asset creation, editing, inactivation, and filtering at desktop and mobile viewport widths. Set `ATL0012_E2E_TICKET_TITLE` to a unique title to create a real ticket and verify its detail view and list entry. For the ATL-0014 workflow, set `ATL0014_E2E_AGENT_EMAIL`, `ATL0014_E2E_REQUESTER_EMAIL`, and `ATL0014_E2E_TICKET_TITLE` to new, unique local values; the test creates active users and leaves the resulting ticket closed.
+Compose starts a dedicated PostgreSQL service, backend, and frontend for Cypress. These services use the internal Docker network and do not publish ports. They never connect to the development `db`, `backend`, or `frontend` services. The test database is stored in `e2e_postgres_data`; the E2E profile resets only this database before each test and seeds two organizations with fixed local test users. The test password and accounts in `cypress/fixtures/accounts.json` are synthetic and must never be used outside this isolated environment.
 
-The test container waits for the frontend health check, which depends on the backend health check and PostgreSQL readiness. Cypress dependencies and its binary are cached in named Docker volumes.
+The suite covers invalid and valid login, session restore/logout, protected API access, user and asset administration, organization authorization boundaries, ticket creation, priority SLA snapshots, assignment, workflow, resolution approval, history, dashboard metrics, and organization separation. Browser flows exercise the real frontend and backend; a small set of UI-only error/loading cases use API interception.
 
-To type-check the E2E config and specs inside the running Cypress image:
+Source, fixtures, configuration, and the npm lockfile live under `tests/e2e`. The E2E directory is bind-mounted; Cypress writes failure screenshots under `cypress/screenshots`. Video recording is disabled. Node.js, npm, Chrome, and Cypress run inside the test container, with npm and Cypress caches in named volumes.
+
+Type-check the Cypress project in its container:
 
 ```powershell
-docker compose --profile e2e run --rm --entrypoint sh e2e -c "npm install --prefer-offline && npm run typecheck"
+docker compose --profile e2e run --rm --entrypoint sh e2e -c "npm ci --prefer-offline && npm run typecheck"
 ```
+
+Do not run `docker compose down -v`; the named development and E2E database volumes are persisted independently.

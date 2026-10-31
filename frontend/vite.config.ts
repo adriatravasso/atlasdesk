@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       host: "0.0.0.0",
-      allowedHosts: ["frontend"],
+      allowedHosts: ["frontend", "e2e-frontend"],
       proxy: {
         "/api": env.VITE_API_TARGET || "http://localhost:8080",
       },

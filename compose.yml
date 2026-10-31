@@ -80,29 +80,90 @@ services:
     profiles: ["e2e"]
     working_dir: /e2e
     entrypoint: ["sh", "-c"]
-    command: ["npm install --prefer-offline && npx cypress run --browser chrome"]
+    command: ["npm ci --prefer-offline && npx cypress run --browser chrome"]
     environment:
       CYPRESS_CACHE_FOLDER: /root/.cache/Cypress
       TZ: America/Manaus
-      CYPRESS_ADMIN_EMAIL: atlasdesk-admin@localhost.test
-      CYPRESS_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
-      CYPRESS_ADMIN_ORGANIZATION_ID: ${DEV_ADMIN_ORGANIZATION_ID:-1}
-      CYPRESS_E2E_USER_EMAIL: ${ATL0008_E2E_USER_EMAIL:-}
-      CYPRESS_E2E_ASSET_NUMBER: ${ATL0010_E2E_ASSET_NUMBER:-}
-      CYPRESS_E2E_TICKET_TITLE: ${ATL0012_E2E_TICKET_TITLE:-}
-      CYPRESS_E2E_AGENT_EMAIL: ${ATL0014_E2E_AGENT_EMAIL:-}
-      CYPRESS_E2E_REQUESTER_EMAIL: ${ATL0014_E2E_REQUESTER_EMAIL:-}
-      CYPRESS_E2E_WORKFLOW_TICKET_TITLE: ${ATL0014_E2E_TICKET_TITLE:-}
+      CYPRESS_BASE_URL: http://e2e-frontend:5173
     volumes:
       - ./tests/e2e:/e2e
       - e2e_node_modules:/e2e/node_modules
       - e2e_npm_cache:/root/.npm
       - cypress_cache:/root/.cache/Cypress
     depends_on:
-      frontend:
+      e2e-frontend:
         condition: service_healthy
     networks:
       - atlasdesk
+
+  e2e-db:
+    image: postgres:16-alpine
+    profiles: ["e2e"]
+    environment:
+      POSTGRES_DB: atlasdesk_e2e
+      POSTGRES_USER: atlasdesk_e2e
+      POSTGRES_PASSWORD: atlasdesk_e2e
+    volumes:
+      - e2e_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlasdesk_e2e -d atlasdesk_e2e"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - atlasdesk
+
+  e2e-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: development
+    profiles: ["e2e"]
+    environment:
+      DB_URL: jdbc:postgresql://e2e-db:5432/atlasdesk_e2e
+      DB_USERNAME: atlasdesk_e2e
+      DB_PASSWORD: atlasdesk_e2e
+      SPRING_PROFILES_ACTIVE: e2e
+      SESSION_COOKIE_SECURE: "false"
+    volumes:
+      - ./backend:/workspace/backend
+      - maven_cache:/root/.m2
+      - e2e_backend_target:/workspace/backend/target
+    depends_on:
+      e2e-db:
+        condition: service_healthy
+    networks:
+      - atlasdesk
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/api/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 45s
+
+  e2e-frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: development
+    profiles: ["e2e"]
+    environment:
+      VITE_API_TARGET: http://e2e-backend:8080
+    volumes:
+      - ./frontend:/workspace/frontend
+      - frontend_node_modules:/workspace/frontend/node_modules
+      - npm_cache:/root/.npm
+    depends_on:
+      e2e-backend:
+        condition: service_healthy
+    networks:
+      - atlasdesk
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
 
 volumes:
   postgres_data:
@@ -113,6 +174,8 @@ volumes:
   e2e_node_modules:
   e2e_npm_cache:
   cypress_cache:
+  e2e_postgres_data:
+  e2e_backend_target:
 
 networks:
   atlasdesk:
