@@ -102,6 +102,10 @@ public class User {
         return active;
     }
 
+    public void deactivate() {
+        active = false;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }

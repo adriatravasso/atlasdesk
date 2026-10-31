@@ -139,6 +139,23 @@ class AuthenticationControllerTest {
                 .andExpect(jsonPath("$.status").value("UP"));
     }
 
+    @Test
+    void currentUserReadIgnoresClientSuppliedOrganizationId() throws Exception {
+        User user = createUser(true);
+        Organization otherOrganization = organizations.saveAndFlush(
+                new Organization("Other organization " + UUID.randomUUID(), false, 72, 24, 4));
+        CsrfFixture csrf = fetchCsrf();
+        MvcResult login = postLogin(user, csrf, TEST_PASSWORD).andExpect(status().isOk()).andReturn();
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+
+        mockMvc.perform(get("/api/auth/me")
+                        .session(session)
+                        .param("organizationId", otherOrganization.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organizationId").value(user.getOrganization().getId()))
+                .andExpect(jsonPath("$.email").value(user.getEmail()));
+    }
+
     private User createUser(boolean active) {
         Organization organization = organizations.saveAndFlush(
                 new Organization("Auth test " + UUID.randomUUID(), false, 72, 24, 4));
