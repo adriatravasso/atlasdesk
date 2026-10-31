@@ -106,7 +106,10 @@ public class TicketDirectoryService {
         AuthenticatedUser actor = currentUser.requireUser();
         Ticket ticket = findTicket(ticketId, actor);
         authorizeTransition(ticket, actor, command);
-        ticket.transition(command, clock.instant());
+        boolean requireApproval = command == TicketCommand.RESOLVE
+                && actor.role() == UserRole.AGENT
+                && ticket.getOrganization().isRequireApproval();
+        ticket.transition(command, clock.instant(), requireApproval);
         return saveAndRead(ticket, actor);
     }
 
@@ -124,6 +127,13 @@ public class TicketDirectoryService {
     }
 
     private static void authorizeTransition(Ticket ticket, AuthenticatedUser actor, TicketCommand command) {
+        if (command == TicketCommand.APPROVE || command == TicketCommand.REJECT) {
+            if (actor.role() != UserRole.ADMIN) {
+                throw new AccessDeniedException("Only administrators can approve or reject resolution");
+            }
+            return;
+        }
+
         if (command == TicketCommand.CLOSE) {
             boolean requesterOwnTicket = actor.role() == UserRole.REQUESTER
                     && ticket.getRequester().getId().equals(actor.id());
