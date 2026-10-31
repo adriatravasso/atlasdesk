@@ -127,4 +127,4 @@ This stops and removes the containers while preserving named volumes and local d
 
 ## Planned
 
-Optional resolution approval, operational dashboards, broader end-to-end coverage, and Jenkins CI are planned for later tasks.
+Optional resolution approval and operational dashboards are available. Broader end-to-end coverage and Jenkins CI remain planned for later tasks.
