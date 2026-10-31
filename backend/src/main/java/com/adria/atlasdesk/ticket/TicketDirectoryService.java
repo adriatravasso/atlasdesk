@@ -1,6 +1,7 @@
 package com.adria.atlasdesk.ticket;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.util.Locale;
 import com.adria.atlasdesk.asset.Asset;
 import com.adria.atlasdesk.asset.AssetRepository;
@@ -28,14 +29,16 @@ public class TicketDirectoryService {
     private final UserRepository users;
     private final AssetRepository assets;
     private final CurrentUserContext currentUser;
+    private final Clock clock;
 
     public TicketDirectoryService(TicketRepository tickets, OrganizationRepository organizations,
-            UserRepository users, AssetRepository assets, CurrentUserContext currentUser) {
+            UserRepository users, AssetRepository assets, CurrentUserContext currentUser, Clock clock) {
         this.tickets = tickets;
         this.organizations = organizations;
         this.users = users;
         this.assets = assets;
         this.currentUser = currentUser;
+        this.clock = clock;
     }
 
     @Transactional
@@ -52,13 +55,14 @@ public class TicketDirectoryService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Asset not found in the current organization"));
 
-        Instant createdAt = Instant.now();
+        Instant createdAt = clock.instant();
         Instant dueAt = createdAt.plusSeconds((long) slaHours(organization, priority) * 60 * 60);
         Ticket ticket = new Ticket(organization, normalizeRequired(title, "Title"),
                 normalizeRequired(description, "Description"), requester, asset, priority, createdAt, dueAt);
         Ticket saved = tickets.saveAndFlush(ticket);
         return tickets.findVisibleSummary(saved.getId(), actor.organizationId(), actor.id(), false)
-                .orElseThrow(TicketNotFoundException::new);
+                .orElseThrow(TicketNotFoundException::new)
+                .withOverdue(clock.instant());
     }
 
     @Transactional(readOnly = true)
@@ -66,8 +70,9 @@ public class TicketDirectoryService {
     public Page<TicketSummary> list(TicketStatus status, TicketPriority priority, String search, Pageable pageable) {
         AuthenticatedUser actor = currentUser.requireUser();
         boolean requesterOnly = actor.role() == UserRole.REQUESTER;
+        Instant now = clock.instant();
         return tickets.searchVisibleTickets(actor.organizationId(), actor.id(), requesterOnly,
-                status, priority, normalizeSearch(search), pageable);
+                status, priority, normalizeSearch(search), pageable).map(ticket -> ticket.withOverdue(now));
     }
 
     @Transactional(readOnly = true)
@@ -76,7 +81,8 @@ public class TicketDirectoryService {
         AuthenticatedUser actor = currentUser.requireUser();
         boolean requesterOnly = actor.role() == UserRole.REQUESTER;
         return tickets.findVisibleSummary(id, actor.organizationId(), actor.id(), requesterOnly)
-                .orElseThrow(TicketNotFoundException::new);
+                .orElseThrow(TicketNotFoundException::new)
+                .withOverdue(clock.instant());
     }
 
     @Transactional
@@ -100,7 +106,7 @@ public class TicketDirectoryService {
         AuthenticatedUser actor = currentUser.requireUser();
         Ticket ticket = findTicket(ticketId, actor);
         authorizeTransition(ticket, actor, command);
-        ticket.transition(command, Instant.now());
+        ticket.transition(command, clock.instant());
         return saveAndRead(ticket, actor);
     }
 
@@ -113,7 +119,8 @@ public class TicketDirectoryService {
         Ticket saved = tickets.saveAndFlush(ticket);
         boolean requesterOnly = actor.role() == UserRole.REQUESTER;
         return tickets.findVisibleSummary(saved.getId(), actor.organizationId(), actor.id(), requesterOnly)
-                .orElseThrow(TicketNotFoundException::new);
+                .orElseThrow(TicketNotFoundException::new)
+                .withOverdue(clock.instant());
     }
 
     private static void authorizeTransition(Ticket ticket, AuthenticatedUser actor, TicketCommand command) {

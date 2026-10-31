@@ -184,6 +184,7 @@ export type Ticket = {
   dueAt: string;
   resolvedAt: string | null;
   closedAt: string | null;
+  overdue: boolean;
 };
 
 export type TicketPage = {
@@ -192,4 +193,10 @@ export type TicketPage = {
   size: number;
   totalElements: number;
   totalPages: number;
+};
+
+export type OrganizationSettings = {
+  slaLowHours: number;
+  slaMediumHours: number;
+  slaHighHours: number;
 };

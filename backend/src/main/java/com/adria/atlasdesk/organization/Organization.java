@@ -86,6 +86,12 @@ public class Organization {
         return slaHighHours;
     }
 
+    public void updateSlaHours(int lowHours, int mediumHours, int highHours) {
+        slaLowHours = lowHours;
+        slaMediumHours = mediumHours;
+        slaHighHours = highHours;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
