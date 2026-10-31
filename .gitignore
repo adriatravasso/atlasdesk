@@ -15,8 +15,11 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/coverage/
-frontend/cypress/screenshots/
-frontend/cypress/videos/
+
+# Cypress E2E
+tests/e2e/node_modules/
+tests/e2e/cypress/screenshots/
+tests/e2e/cypress/videos/
 
 # IDE and operating system
 .idea/
