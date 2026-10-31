@@ -305,6 +305,95 @@ class TicketControllerTest {
     }
 
     @Test
+    void requiredApprovalLetsOnlySameOrganizationAdminApproveOrRejectAgentResolution() throws Exception {
+        Organization organization = createOrganization("Ticket approval", true);
+        Organization foreignOrganization = createOrganization("Foreign ticket approval");
+        User requester = createUser(organization, "Approval Requester", UserRole.REQUESTER);
+        User agent = createUser(organization, "Approval Agent", UserRole.AGENT);
+        User admin = createUser(organization, "Approval Admin", UserRole.ADMIN);
+        User foreignAdmin = createUser(foreignOrganization, "Foreign Approval Admin", UserRole.ADMIN);
+        User foreignRequester = createUser(foreignOrganization, "Foreign Approval Requester", UserRole.REQUESTER);
+        Ticket approvedTicket = createTicket(organization, requester, "Approve resolution", TicketPriority.HIGH);
+        Ticket rejectedTicket = createTicket(organization, requester, "Reject resolution", TicketPriority.MEDIUM);
+        Ticket adminTicket = createTicket(organization, requester, "Admin direct resolution", TicketPriority.LOW);
+        Ticket foreignTicket = createTicket(foreignOrganization, foreignRequester,
+                "Foreign approval target", TicketPriority.LOW);
+        approvedTicket.assignTo(agent);
+        rejectedTicket.assignTo(agent);
+        tickets.saveAndFlush(approvedTicket);
+        tickets.saveAndFlush(rejectedTicket);
+        entityManager.createNativeQuery("update tickets set status = 'PENDING_APPROVAL' where id = :id")
+                .setParameter("id", foreignTicket.getId()).executeUpdate();
+        entityManager.clear();
+
+        CsrfFixture csrf = fetchCsrf();
+        MockHttpSession requesterSession = login(requester, csrf);
+        MockHttpSession agentSession = login(agent, csrf);
+        MockHttpSession adminSession = login(admin, csrf);
+        MockHttpSession foreignAdminSession = login(foreignAdmin, csrf);
+
+        for (Ticket ticket : new Ticket[] {approvedTicket, rejectedTicket}) {
+            mockMvc.perform(post("/api/tickets/{id}/transition", ticket.getId())
+                            .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                            .contentType("application/json").content("{\"command\":\"START\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+            mockMvc.perform(post("/api/tickets/{id}/transition", ticket.getId())
+                            .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                            .contentType("application/json").content("{\"command\":\"RESOLVE\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("PENDING_APPROVAL"))
+                    .andExpect(jsonPath("$.resolvedAt").value(org.hamcrest.Matchers.nullValue()));
+        }
+
+        mockMvc.perform(post("/api/tickets/{id}/transition", approvedTicket.getId())
+                        .session(agentSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"APPROVE\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/tickets/{id}/transition", approvedTicket.getId())
+                        .session(requesterSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"REJECT\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/tickets/{id}/transition", foreignTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"APPROVE\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/tickets/{id}/transition", approvedTicket.getId())
+                        .session(foreignAdminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"APPROVE\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/tickets/{id}/transition", approvedTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"APPROVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.resolvedAt").isNotEmpty());
+        mockMvc.perform(post("/api/tickets/{id}/transition", rejectedTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"REJECT\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.resolvedAt").value(org.hamcrest.Matchers.nullValue()));
+        mockMvc.perform(post("/api/tickets/{id}/transition", rejectedTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"APPROVE\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/tickets/{id}/transition", adminTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"APPROVE\"}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/tickets/{id}/transition", adminTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"START\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/tickets/{id}/transition", adminTicket.getId())
+                        .session(adminSession).cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json").content("{\"command\":\"RESOLVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
     void rejectsInvalidTransitionAssigneeAndCrossOrganizationOperations() throws Exception {
         Organization organization = createOrganization("Ticket invalid operations");
         Organization foreignOrganization = createOrganization("Ticket foreign operations");
@@ -404,6 +493,11 @@ class TicketControllerTest {
 
     private Organization createOrganization(String name) {
         return organizations.saveAndFlush(new Organization(name + " " + UUID.randomUUID(), false, 72, 24, 4));
+    }
+
+    private Organization createOrganization(String name, boolean requireApproval) {
+        return organizations.saveAndFlush(new Organization(name + " " + UUID.randomUUID(), requireApproval,
+                72, 24, 4));
     }
 
     private Organization createOrganization(String name, int lowHours, int mediumHours, int highHours) {

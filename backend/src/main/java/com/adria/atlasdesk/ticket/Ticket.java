@@ -170,7 +170,7 @@ public class Ticket {
         assignedAgent = agent;
     }
 
-    public void transition(TicketCommand command, Instant occurredAt) {
+    public void transition(TicketCommand command, Instant occurredAt, boolean requireApproval) {
         switch (command) {
             case START -> {
                 requireStatus(TicketStatus.OPEN, command);
@@ -178,8 +178,22 @@ public class Ticket {
             }
             case RESOLVE -> {
                 requireStatus(TicketStatus.IN_PROGRESS, command);
+                if (requireApproval) {
+                    status = TicketStatus.PENDING_APPROVAL;
+                } else {
+                    status = TicketStatus.RESOLVED;
+                    resolvedAt = occurredAt;
+                }
+            }
+            case APPROVE -> {
+                requireStatus(TicketStatus.PENDING_APPROVAL, command);
                 status = TicketStatus.RESOLVED;
                 resolvedAt = occurredAt;
+            }
+            case REJECT -> {
+                requireStatus(TicketStatus.PENDING_APPROVAL, command);
+                status = TicketStatus.IN_PROGRESS;
+                resolvedAt = null;
             }
             case CLOSE -> {
                 requireStatus(TicketStatus.RESOLVED, command);
