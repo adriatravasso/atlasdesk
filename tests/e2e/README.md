@@ -9,7 +9,7 @@ docker compose up -d --build db backend frontend
 docker compose --profile e2e run --rm e2e
 ```
 
-For the real-session case, set `DEV_ADMIN_PASSWORD` and `DEV_ADMIN_ORGANIZATION_ID` in `.env` as described in the root README. Cypress receives those values from Compose. Without the password, only the invalid-credentials case runs.
+For the real-session case, set `DEV_ADMIN_PASSWORD` and `DEV_ADMIN_ORGANIZATION_ID` in `.env` as described in the root README. Cypress receives those values from Compose. Without the password, only the invalid-credentials case runs. To include the user-directory UI flow, also set `ATL0008_E2E_USER_EMAIL` to a new, unique local email; Cypress creates, edits, and deactivates that account.
 
 The test container waits for the frontend health check, which depends on the backend health check and PostgreSQL readiness. Cypress dependencies and its binary are cached in named Docker volumes.
 

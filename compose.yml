@@ -86,6 +86,7 @@ services:
       CYPRESS_ADMIN_EMAIL: atlasdesk-admin@localhost.test
       CYPRESS_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
       CYPRESS_ADMIN_ORGANIZATION_ID: ${DEV_ADMIN_ORGANIZATION_ID:-1}
+      CYPRESS_E2E_USER_EMAIL: ${ATL0008_E2E_USER_EMAIL:-}
     volumes:
       - ./tests/e2e:/e2e
       - e2e_node_modules:/e2e/node_modules
