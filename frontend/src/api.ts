@@ -138,3 +138,25 @@ export type UserPage = {
   totalElements: number;
   totalPages: number;
 };
+
+export type AssetStatus = "ACTIVE" | "INACTIVE";
+
+export type Asset = {
+  id: number;
+  organizationId: number;
+  assetNumber: string;
+  name: string;
+  type: string;
+  description: string | null;
+  status: AssetStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AssetPage = {
+  content: Asset[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
