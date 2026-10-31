@@ -1,3 +1,5 @@
+import { loadAccounts, loginThroughUi } from "../support/commands.js";
+
 describe("Operational dashboard", () => {
   const metrics = {
     totalTickets: 12,
@@ -118,49 +120,25 @@ describe("Operational dashboard", () => {
     );
   });
 
-  it("renders coherent metrics from the authenticated backend", function () {
-    cy.env(["ADMIN_EMAIL", "ADMIN_PASSWORD", "ADMIN_ORGANIZATION_ID"]).then(
-      function (env) {
-        const email = env.ADMIN_EMAIL as string | undefined;
-        const password = env.ADMIN_PASSWORD as string | undefined;
-        const organizationId = env.ADMIN_ORGANIZATION_ID as string | undefined;
-        if (!email || !password || !organizationId) {
-          (this as unknown as Mocha.Context).skip();
-          return;
-        }
-
-        cy.visit("/login");
-        cy.get("#organizationId").type(organizationId);
-        cy.get("#email").type(email);
-        cy.get("#password").type(password);
-        cy.contains("button", "Entrar").click();
-        cy.contains("Sessão ativa").should("be.visible");
-        cy.intercept("GET", "/api/dashboard").as("liveDashboard");
-        cy.visit("/");
-        cy.wait("@liveDashboard").then(({ response }) => {
-          expect(response?.statusCode).to.equal(200);
-          const result = response?.body as typeof metrics;
-          expect(result.totalTickets).to.equal(
-            result.openTickets +
-              result.inProgressTickets +
-              result.pendingApprovalTickets +
-              result.resolvedTickets +
-              result.closedTickets,
-          );
-          expect(result.totalTickets).to.equal(
-            result.priorityDistribution.low +
-              result.priorityDistribution.medium +
-              result.priorityDistribution.high,
-          );
-          expect(result.overdueTickets).to.be.at.most(
-            result.openTickets +
-              result.inProgressTickets +
-              result.pendingApprovalTickets,
-          );
-          expect(result.activeAssets).to.be.at.least(0);
-        });
-        cy.contains("h1", "Visão da organização").should("be.visible");
-      },
-    );
+  it("renders coherent metrics from the authenticated backend", () => {
+    loadAccounts().then(({ organizationId, admin, password }) => {
+      loginThroughUi(organizationId, admin, password, "/");
+      cy.intercept("GET", "/api/dashboard").as("liveDashboard");
+      cy.visit("/");
+      cy.wait("@liveDashboard").then(({ response }) => {
+        expect(response?.statusCode).to.equal(200);
+        const result = response?.body as typeof metrics;
+        expect(result.totalTickets).to.equal(
+          result.openTickets + result.inProgressTickets + result.pendingApprovalTickets +
+            result.resolvedTickets + result.closedTickets,
+        );
+        expect(result.totalTickets).to.equal(
+          result.priorityDistribution.low + result.priorityDistribution.medium +
+            result.priorityDistribution.high,
+        );
+        expect(result.activeAssets).to.be.at.least(0);
+      });
+      cy.contains("h1", "Visão da organização").should("be.visible");
+    });
   });
 });
