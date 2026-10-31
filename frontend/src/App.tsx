@@ -1424,8 +1424,14 @@ function TicketDetailPage() {
           : action === "START"
             ? "Atendimento iniciado."
             : action === "RESOLVE"
-              ? "Chamado resolvido."
-              : "Chamado encerrado.",
+              ? updated.status === "PENDING_APPROVAL"
+                ? "Resolução enviada para aprovação."
+                : "Chamado resolvido."
+              : action === "APPROVE"
+                ? "Resolução aprovada."
+                : action === "REJECT"
+                  ? "Resolução rejeitada; o chamado voltou para atendimento."
+                  : "Chamado encerrado.",
       );
     } catch (cause) {
       setActionError(
@@ -1455,6 +1461,7 @@ function TicketDetailPage() {
   const canClose =
     ticket?.status === "RESOLVED" &&
     (isAdmin || (isRequester && ticket.requesterId === user?.id));
+  const canReview = isAdmin && ticket?.status === "PENDING_APPROVAL";
 
   return (
     <section className="page-content">
@@ -1505,6 +1512,7 @@ function TicketDetailPage() {
           {(canAssume ||
             (canHandle &&
               (ticket.status === "OPEN" || ticket.status === "IN_PROGRESS")) ||
+            canReview ||
             canClose) && (
             <div
               className="ticket-actions"
@@ -1541,6 +1549,28 @@ function TicketDetailPage() {
                     ? "Resolvendo…"
                     : "Resolver chamado"}
                 </button>
+              )}
+              {canReview && (
+                <>
+                  <button
+                    className="button button--primary"
+                    onClick={() => void runAction("APPROVE")}
+                    disabled={loading || busyAction !== null}
+                  >
+                    {busyAction === "APPROVE"
+                      ? "Aprovando…"
+                      : "Aprovar resolução"}
+                  </button>
+                  <button
+                    className="button button--quiet"
+                    onClick={() => void runAction("REJECT")}
+                    disabled={loading || busyAction !== null}
+                  >
+                    {busyAction === "REJECT"
+                      ? "Rejeitando…"
+                      : "Rejeitar resolução"}
+                  </button>
+                </>
               )}
               {canClose && (
                 <button
