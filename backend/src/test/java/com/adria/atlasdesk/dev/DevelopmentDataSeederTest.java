@@ -33,7 +33,7 @@ class DevelopmentDataSeederTest {
                         && !organization.isRequireApproval()
                         && organization.getSlaLowHours() == 72
                         && organization.getSlaMediumHours() == 24
-                        && organization.getSlaHighHours() == 4));
+                        && organization.getSlaHighHours() == 8));
         verifyNoMoreInteractions(users, encoder);
     }
 

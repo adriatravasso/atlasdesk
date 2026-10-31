@@ -17,6 +17,7 @@ import {
   type Asset,
   type AssetPage,
   type AssetStatus,
+  type OrganizationSettings,
   type Ticket,
   type TicketCommand,
   type TicketPage,
@@ -55,6 +56,14 @@ function App() {
               element={
                 <RoleRoute roles={["ADMIN"]}>
                   <UsersPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <RoleRoute roles={["ADMIN"]}>
+                  <SettingsPage />
                 </RoleRoute>
               }
             />
@@ -136,6 +145,9 @@ function Shell({
           <NavLink to="/tickets">Chamados</NavLink>
           <NavLink to="/assets">Ativos</NavLink>
           {user.role === "ADMIN" && <NavLink to="/users">Usuários</NavLink>}
+          {user.role === "ADMIN" && (
+            <NavLink to="/settings">Configurações</NavLink>
+          )}
         </nav>
         <div className="sidebar-foot">
           <span className="workspace-dot" />{" "}
@@ -184,6 +196,7 @@ function Shell({
           <NavLink to="/tickets">Chamados</NavLink>
           <NavLink to="/assets">Ativos</NavLink>
           {user.role === "ADMIN" && <NavLink to="/users">Usuários</NavLink>}
+          {user.role === "ADMIN" && <NavLink to="/settings">Ajustes</NavLink>}
         </nav>
       </div>
     </div>
@@ -228,6 +241,185 @@ function ForbiddenPage() {
       <Link className="button button--primary" to="/">
         Voltar à visão geral
       </Link>
+    </section>
+  );
+}
+
+function SettingsPage() {
+  const [settings, setSettings] = useState<OrganizationSettings | null>(null);
+  const [form, setForm] = useState({ low: "", medium: "", high: "" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
+    request<OrganizationSettings>("/settings")
+      .then((result) => {
+        if (!active) return;
+        setSettings(result);
+        setForm({
+          low: String(result.slaLowHours),
+          medium: String(result.slaMediumHours),
+          high: String(result.slaHighHours),
+        });
+      })
+      .catch((cause: unknown) => {
+        if (active)
+          setLoadError(
+            cause instanceof ApiError
+              ? cause.detail
+              : "Não foi possível carregar as configurações da organização.",
+          );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+    setNotice(null);
+    const values = [form.low, form.medium, form.high].map(Number);
+    if (
+      values.some(
+        (value) => !Number.isInteger(value) || value < 1 || value > 720,
+      )
+    ) {
+      setFormError("Informe prazos inteiros entre 1 e 720 horas.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await request<OrganizationSettings>("/settings", {
+        method: "PATCH",
+        body: JSON.stringify({
+          slaLowHours: values[0],
+          slaMediumHours: values[1],
+          slaHighHours: values[2],
+        }),
+      });
+      setSettings(updated);
+      setForm({
+        low: String(updated.slaLowHours),
+        medium: String(updated.slaMediumHours),
+        high: String(updated.slaHighHours),
+      });
+      setNotice("Prazos de SLA atualizados. Eles valem para novos chamados.");
+    } catch (cause) {
+      setFormError(
+        cause instanceof ApiError
+          ? cause.detail
+          : "Não foi possível salvar as configurações. Tente novamente.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="page-content">
+      <p className="eyebrow">ADMINISTRAÇÃO</p>
+      <h1>Configurações</h1>
+      <p className="page-lead">
+        Defina os prazos de SLA em horas corridas. Cada chamado mantém o prazo
+        calculado quando foi criado.
+      </p>
+      {notice && (
+        <div className="notice notice--success" role="status">
+          {notice}
+        </div>
+      )}
+      {loadError && (
+        <div className="notice notice--error" role="alert">
+          {loadError}{" "}
+          <button
+            className="text-button"
+            onClick={() => setReloadToken((token) => token + 1)}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+      {loading && <p role="status">Carregando configurações…</p>}
+      {settings && !loadError && (
+        <form className="user-form-card settings-form" onSubmit={saveSettings}>
+          {formError && (
+            <div className="notice notice--error" role="alert">
+              {formError}
+            </div>
+          )}
+          <div className="user-form-grid">
+            <label>
+              Prioridade baixa (horas)
+              <input
+                name="slaLowHours"
+                type="number"
+                min="1"
+                max="720"
+                step="1"
+                value={form.low}
+                onChange={(event) =>
+                  setForm({ ...form, low: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Prioridade média (horas)
+              <input
+                name="slaMediumHours"
+                type="number"
+                min="1"
+                max="720"
+                step="1"
+                value={form.medium}
+                onChange={(event) =>
+                  setForm({ ...form, medium: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Prioridade alta (horas)
+              <input
+                name="slaHighHours"
+                type="number"
+                min="1"
+                max="720"
+                step="1"
+                value={form.high}
+                onChange={(event) =>
+                  setForm({ ...form, high: event.target.value })
+                }
+                required
+              />
+            </label>
+          </div>
+          <p className="settings-help">
+            Valores aceitos: 1 a 720 horas (até 30 dias). Alterar a prioridade
+            ou o SLA não recalcula prazos de chamados já criados.
+          </p>
+          <div className="user-form-actions">
+            <button
+              className="button button--primary"
+              type="submit"
+              disabled={saving || loading}
+            >
+              {saving ? "Salvando…" : "Salvar configurações"}
+            </button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }
@@ -939,6 +1131,15 @@ function TicketsPage() {
                         >
                           {statusName(ticket.status)}
                         </span>
+                        {ticket.overdue && (
+                          <span
+                            className="ticket-overdue"
+                            role="status"
+                            aria-label="Chamado atrasado"
+                          >
+                            Atrasado
+                          </span>
+                        )}
                       </td>
                       <td>{priorityName(ticket.priority)}</td>
                       <td>{ticket.requesterName}</td>
@@ -1379,7 +1580,14 @@ function TicketDetailPage() {
             </div>
             <div>
               <dt>Prazo SLA</dt>
-              <dd>{formatDate(ticket.dueAt)}</dd>
+              <dd>
+                {formatDate(ticket.dueAt)}{" "}
+                {ticket.overdue && (
+                  <span className="ticket-overdue" role="status">
+                    Atrasado
+                  </span>
+                )}
+              </dd>
             </div>
             {ticket.resolvedAt && (
               <div>

@@ -22,7 +22,7 @@ public class DevelopmentDataSeeder {
         return args -> {
             String name = "AtlasDesk Local";
             if (!organizations.existsByName(name)) {
-                organizations.save(new Organization(name, false, 72, 24, 4));
+                organizations.save(new Organization(name, false, 72, 24, 8));
             }
             if (!adminPassword.isBlank()) {
                 Organization organization = organizations.findByName(name).orElseThrow();
