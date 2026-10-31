@@ -17,6 +17,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "tickets")
@@ -70,6 +71,10 @@ public class Ticket {
 
     @Column(name = "closed_at")
     private Instant closedAt;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     protected Ticket() {
     }
@@ -156,5 +161,38 @@ public class Ticket {
 
     public Instant getClosedAt() {
         return closedAt;
+    }
+
+    public void assignTo(User agent) {
+        if (status != TicketStatus.OPEN && status != TicketStatus.IN_PROGRESS) {
+            throw new TicketConflictException("Only open or in-progress tickets can be assigned");
+        }
+        assignedAgent = agent;
+    }
+
+    public void transition(TicketCommand command, Instant occurredAt) {
+        switch (command) {
+            case START -> {
+                requireStatus(TicketStatus.OPEN, command);
+                status = TicketStatus.IN_PROGRESS;
+            }
+            case RESOLVE -> {
+                requireStatus(TicketStatus.IN_PROGRESS, command);
+                status = TicketStatus.RESOLVED;
+                resolvedAt = occurredAt;
+            }
+            case CLOSE -> {
+                requireStatus(TicketStatus.RESOLVED, command);
+                status = TicketStatus.CLOSED;
+                closedAt = occurredAt;
+            }
+        }
+    }
+
+    private void requireStatus(TicketStatus required, TicketCommand command) {
+        if (status != required) {
+            throw new TicketConflictException(
+                    "Cannot " + command.name().toLowerCase() + " a ticket in " + status.name() + " status");
+        }
     }
 }
