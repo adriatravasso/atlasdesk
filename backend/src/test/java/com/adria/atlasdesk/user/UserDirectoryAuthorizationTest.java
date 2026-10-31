@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -55,7 +56,7 @@ class UserDirectoryAuthorizationTest {
         authenticateAs(currentUserRecord, UserRole.ADMIN);
 
         assertThat(currentUser.organizationId()).isEqualTo(currentOrganization.getId());
-        assertThat(userDirectory.findAllInCurrentOrganization())
+        assertThat(userDirectory.findAllInCurrentOrganization(PageRequest.of(0, 20)).getContent())
                 .extracting(UserSummary::id)
                 .containsExactlyInAnyOrder(currentUserRecord.getId(), secondCurrentOrganizationUser.getId())
                 .doesNotContain(foreignUser.getId());
@@ -71,7 +72,7 @@ class UserDirectoryAuthorizationTest {
 
         for (UserRole role : List.of(UserRole.AGENT, UserRole.REQUESTER)) {
             authenticateAs(admin, role);
-            assertThatThrownBy(userDirectory::findAllInCurrentOrganization)
+            assertThatThrownBy(() -> userDirectory.findAllInCurrentOrganization(PageRequest.of(0, 20)))
                     .isInstanceOf(AccessDeniedException.class);
             assertThatThrownBy(() -> userDirectory.findByIdInCurrentOrganization(target.getId()))
                     .isInstanceOf(AccessDeniedException.class);

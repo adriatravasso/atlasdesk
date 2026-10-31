@@ -30,12 +30,15 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
     private final CsrfTokenRepository csrfTokenRepository;
+    private final CurrentUserContext currentUser;
 
     public AuthController(AuthenticationManager authenticationManager,
-            SecurityContextRepository securityContextRepository, CsrfTokenRepository csrfTokenRepository) {
+            SecurityContextRepository securityContextRepository, CsrfTokenRepository csrfTokenRepository,
+            CurrentUserContext currentUser) {
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
         this.csrfTokenRepository = csrfTokenRepository;
+        this.currentUser = currentUser;
     }
 
     @GetMapping("/csrf")
@@ -70,11 +73,8 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public AuthUserResponse me(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        }
-        return toUserResponse(user);
+    public AuthUserResponse me() {
+        return toUserResponse(currentUser.requireUser());
     }
 
     private static AuthUserResponse toUserResponse(AuthenticatedUser user) {
