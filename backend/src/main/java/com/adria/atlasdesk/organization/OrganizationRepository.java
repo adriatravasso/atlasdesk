@@ -11,6 +11,8 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
 
     boolean existsByName(String name);
 
+    Optional<Organization> findByName(String name);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select organization from Organization organization where organization.id = :id")
     Optional<Organization> findByIdForUpdate(@Param("id") Long id);

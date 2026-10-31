@@ -30,6 +30,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-atlasdesk_dev}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      APP_DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
     ports:
       - "8080:8080"
     volumes:
@@ -82,6 +83,9 @@ services:
     command: ["npm install --prefer-offline && npx cypress run --browser chrome"]
     environment:
       CYPRESS_CACHE_FOLDER: /root/.cache/Cypress
+      CYPRESS_ADMIN_EMAIL: atlasdesk-admin@localhost.test
+      CYPRESS_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
+      CYPRESS_ADMIN_ORGANIZATION_ID: ${DEV_ADMIN_ORGANIZATION_ID:-1}
     volumes:
       - ./tests/e2e:/e2e
       - e2e_node_modules:/e2e/node_modules

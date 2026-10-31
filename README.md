@@ -38,11 +38,20 @@ The backend and frontend source directories are bind-mounted. Vite refreshes fro
 docker compose restart backend
 ```
 
-The Compose backend explicitly activates the `dev` Spring profile by default, which idempotently seeds the `AtlasDesk Local` organization without creating users or credentials. Set `SPRING_PROFILES_ACTIVE` in `.env` to change the active profile; production runs should not activate `dev`.
+The Compose backend explicitly activates the `dev` Spring profile by default, which idempotently seeds the `AtlasDesk Local` organization. It creates no user unless `DEV_ADMIN_PASSWORD` is supplied in the ignored `.env` file. When supplied, it creates the local ADMIN account `atlasdesk-admin@localhost.test` with that password. This account is dev-profile-only. Set `SPRING_PROFILES_ACTIVE` in `.env` to change the active profile; production runs should not activate `dev`.
 
 ## Authentication
 
-The API uses an HttpOnly session cookie. In development, the Vite `/api` proxy keeps browser requests same-origin at `http://localhost:5173`. First call `GET /api/auth/csrf`; send its token in the named header and the `XSRF-TOKEN` cookie on `POST /api/auth/login` and `POST /api/auth/logout`. Login JSON contains `organizationId`, `email`, and `password`. `GET /api/auth/me` returns the signed-in user's public profile without password data. Do not store passwords or session identifiers in browser storage. `SESSION_COOKIE_SECURE` defaults to `false` for local HTTP; set it to `true` when serving the application over HTTPS.
+The React app provides a protected session shell, login, overview, and ADMIN-only user directory. It uses the Fetch API with the HttpOnly session cookie; mutating requests first obtain CSRF and send its token in the named header. Login JSON contains `organizationId`, `email`, and `password`. `GET /api/auth/me` restores a session after reload. Do not store passwords or session identifiers in browser storage. `SESSION_COOKIE_SECURE` defaults to `false` for local HTTP; set it to `true` when serving the application over HTTPS.
+
+For a local authenticated smoke test, set a development password in `.env` (use at least 12 characters) and restart the backend. The seeded `AtlasDesk Local` organization is normally ID `1`; confirm it with `docker compose exec db psql -U atlasdesk -d atlasdesk -c "select id, name from organizations;"`. Set `DEV_ADMIN_ORGANIZATION_ID` to that ID in `.env`. The Cypress profile reads the same email, organization ID, and password. Then run:
+
+```powershell
+docker compose up -d --build db backend frontend
+docker compose --profile e2e run --rm e2e
+```
+
+Without `DEV_ADMIN_PASSWORD`, the invalid-credentials smoke check still runs and the real-session Cypress case is skipped.
 
 User administration is available to ADMIN sessions at `GET /api/users?page=0&size=20`, `POST /api/users`, and `PATCH /api/users/{id}`. Create requests require `name`, `email`, `role`, and `password`; `active` defaults to `true`. PATCH accepts only supplied fields. Send the CSRF cookie and token header for POST/PATCH. User queries and changes always use the authenticated session's organization; password hashes are never returned, and the last active ADMIN cannot be deactivated or demoted.
 
@@ -91,11 +100,11 @@ This stops and removes the containers while preserving named volumes and local d
 - Spring Boot API with `GET /api/health`, returning `{"status":"UP","service":"atlasdesk-api"}`.
 - PostgreSQL datasource configuration and Flyway integration.
 - A web MVC test for the health endpoint.
-- React welcome page with live API connection status and Vite API proxy.
+- React authenticated shell, session restoration, login/logout, role-protected user directory, and Vite API proxy.
 - PostgreSQL 16, backend, and frontend Compose services with health checks, service dependencies, bind mounts, and persistent caches.
 - Production image stages for the backend and frontend Dockerfiles.
 - Cypress E2E smoke test and isolated dependency lockfile under `tests/e2e`, run in an opt-in Compose profile.
 
 ## Planned
 
-Authentication and authorization, organizations and users, support tickets, IT assets, configurable SLAs, optional resolution approval, operational dashboards, broader end-to-end coverage, and Jenkins CI are planned for later tasks.
+Support tickets, IT assets, configurable SLAs, optional resolution approval, operational dashboards, broader end-to-end coverage, and Jenkins CI are planned for later tasks.
