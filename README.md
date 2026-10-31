@@ -8,6 +8,7 @@ AtlasDesk is an IT service management application foundation for managing suppor
 - Frontend: React 18.3.1, React DOM 18.3.1, TypeScript strict mode, Vite, ESLint, Prettier, native CSS.
 - Database: PostgreSQL 16 with Docker Compose.
 - End-to-end: Cypress 15 in [`tests/e2e`](tests/e2e/README.md), run through the optional Docker Compose `e2e` profile.
+- CI: Jenkins Declarative Pipeline in the root [`Jenkinsfile`](Jenkinsfile), using a Docker-enabled agent.
 
 ## Architecture
 
@@ -100,6 +101,14 @@ docker compose --profile e2e run --rm e2e
 
 The E2E project also has a container-only TypeScript check; see [`tests/e2e/README.md`](tests/e2e/README.md).
 
+## Jenkins CI
+
+Create a **Multibranch Pipeline** job in Jenkins with the GitHub Branch Source integration already available on that instance, connect it to `adriatravasso/atlasdesk` using the configured GitHub credentials, and keep the script path as `Jenkinsfile` at the repository root. Enable pull request discovery in the branch source so branches and PRs receive build status feedback. Assign the Docker-enabled Linux executor the label `docker-compose` used by the pipeline.
+
+The selected Linux agent must provide Docker CLI, Docker Compose v2, and access to a Docker Engine. It does not need Java, Maven, Node.js, npm, PostgreSQL, or Cypress installed: each validation runs inside the existing Compose images. The Jenkins agent manages Docker externally; application containers do not mount the Docker socket.
+
+Each build sets a unique `COMPOSE_PROJECT_NAME`, uses only the isolated `e2e` database and synthetic test accounts, and waits for the Compose health checks before Cypress runs. The pipeline archives Maven Surefire XML and Cypress screenshots/videos when present. Cleanup removes that build's containers and network without removing named volumes; build-specific test volumes are isolated from development and can be removed by the Jenkins infrastructure owner under that runner's retention policy.
+
 Flyway applies versioned schema migrations during backend startup. The initial migration creates organization and user tables; JPA validates the schema rather than updating it.
 
 ## Stop development
@@ -126,4 +135,4 @@ This stops and removes the containers while preserving named volumes and local d
 
 ## Planned
 
-Optional resolution approval and operational dashboards are available. Jenkins CI remains planned for a later task.
+Optional resolution approval and operational dashboards are available. Jenkins CI runs through the root declarative pipeline on a Docker-enabled agent.
