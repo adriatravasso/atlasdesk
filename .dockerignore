@@ -9,6 +9,7 @@
 **/dist
 **/target
 **/.m2
+**/.ci-reports
 **/coverage
 **/cypress/screenshots
 **/cypress/videos

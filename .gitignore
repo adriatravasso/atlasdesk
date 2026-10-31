@@ -6,6 +6,7 @@
 # Java / Maven
 backend/target/
 backend/.m2/
+backend/.ci-reports/
 backend/.classpath
 backend/.project
 backend/.settings/
