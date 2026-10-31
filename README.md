@@ -7,7 +7,7 @@ AtlasDesk is an IT service management application foundation for managing suppor
 - Backend: Java 21, Spring Boot 3.5, Spring MVC, Spring Data JPA, Hibernate, Jakarta Validation, PostgreSQL JDBC, Flyway, Maven Wrapper, JUnit 5.
 - Frontend: React 18.3.1, React DOM 18.3.1, TypeScript strict mode, Vite, ESLint, Prettier, native CSS.
 - Database: PostgreSQL 16 with Docker Compose.
-- End-to-end: Cypress in the optional Docker Compose `e2e` profile.
+- End-to-end: Cypress 15 in [`tests/e2e`](tests/e2e/README.md), run through the optional Docker Compose `e2e` profile.
 
 ## Architecture
 
@@ -21,11 +21,12 @@ Java, Maven, Node.js, npm, and PostgreSQL are provided or run inside containers;
 
 ## Start development
 
-Copy the illustrative development settings and start the stack from the project root:
+Copy the illustrative development settings, validate Compose, and start the application services from the project root:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build -d
+docker compose config
+docker compose up -d --build db backend frontend
 docker compose ps
 ```
 
@@ -37,7 +38,14 @@ The backend and frontend source directories are bind-mounted. Vite refreshes fro
 docker compose restart backend
 ```
 
-Named volumes preserve PostgreSQL data and Maven, npm, Cypress, frontend dependency, and backend build caches across container restarts. The example database credentials are for local development only. Set matching `POSTGRES_*` and `DB_*` values in `.env` when changing them.
+Named volumes preserve PostgreSQL data and Maven, npm, Cypress, frontend dependency, E2E dependency, and backend build caches across container restarts. The example database credentials are for local development only. Set matching `POSTGRES_*` and `DB_*` values in `.env` when changing them.
+
+Build the application images or follow service logs when needed:
+
+```powershell
+docker compose build backend frontend
+docker compose logs -f db backend frontend
+```
 
 ## Validate inside containers
 
@@ -52,11 +60,13 @@ docker compose exec frontend npm run format:check
 docker compose exec frontend npm run build
 ```
 
-Run the Cypress browser smoke test on demand. Compose starts its dependent services and removes the one-off test container when it exits:
+Run the Cypress browser smoke test on demand. Compose starts its dependent services and removes the one-off test container when it exits. The config, spec, package manifest, and lockfile live in `tests/e2e`:
 
 ```powershell
 docker compose --profile e2e run --rm e2e
 ```
+
+The E2E project also has a container-only TypeScript check; see [`tests/e2e/README.md`](tests/e2e/README.md).
 
 Flyway runs during backend startup. No business tables or placeholder migrations are created.
 
@@ -76,7 +86,7 @@ This stops and removes the containers while preserving named volumes and local d
 - React welcome page with live API connection status and Vite API proxy.
 - PostgreSQL 16, backend, and frontend Compose services with health checks, service dependencies, bind mounts, and persistent caches.
 - Production image stages for the backend and frontend Dockerfiles.
-- Cypress E2E smoke test in an opt-in Compose profile.
+- Cypress E2E smoke test and isolated dependency lockfile under `tests/e2e`, run in an opt-in Compose profile.
 
 ## Planned
 

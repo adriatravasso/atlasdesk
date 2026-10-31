@@ -15,6 +15,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - atlasdesk
 
   backend:
     build:
@@ -35,6 +37,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - atlasdesk
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/api/health | grep -q '\"status\":\"UP\"'"]
       interval: 10s
@@ -59,6 +63,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - atlasdesk
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s
@@ -67,19 +73,23 @@ services:
       start_period: 20s
 
   e2e:
-    image: cypress/included:15.21.1
+    image: cypress/browsers:22.15.0
     profiles: ["e2e"]
     working_dir: /e2e
+    entrypoint: ["sh", "-c"]
+    command: ["npm install --prefer-offline && npx cypress run --browser chrome"]
     environment:
       CYPRESS_CACHE_FOLDER: /root/.cache/Cypress
     volumes:
-      - ./frontend/cypress:/e2e/cypress
-      - ./frontend/cypress.config.cjs:/e2e/cypress.config.cjs:ro
+      - ./tests/e2e:/e2e
+      - e2e_node_modules:/e2e/node_modules
+      - e2e_npm_cache:/root/.npm
       - cypress_cache:/root/.cache/Cypress
     depends_on:
       frontend:
         condition: service_healthy
-    command: ["run", "--browser", "chrome"]
+    networks:
+      - atlasdesk
 
 volumes:
   postgres_data:
@@ -87,4 +97,10 @@ volumes:
   backend_target:
   frontend_node_modules:
   npm_cache:
+  e2e_node_modules:
+  e2e_npm_cache:
   cypress_cache:
+
+networks:
+  atlasdesk:
+    driver: bridge
