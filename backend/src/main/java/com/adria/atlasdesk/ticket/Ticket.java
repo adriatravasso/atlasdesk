@@ -163,6 +163,10 @@ public class Ticket {
         return closedAt;
     }
 
+    public long getVersion() {
+        return version;
+    }
+
     public void assignTo(User agent) {
         if (status != TicketStatus.OPEN && status != TicketStatus.IN_PROGRESS) {
             throw new TicketConflictException("Only open or in-progress tickets can be assigned");

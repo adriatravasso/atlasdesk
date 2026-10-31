@@ -884,15 +884,23 @@ tbody tr:last-child td {
 .ticket-timeline li {
   padding-left: 4px;
 }
+.ticket-timeline li > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 3px;
+}
 .ticket-timeline li::marker {
   color: #547ba8;
 }
 .ticket-timeline strong {
-  margin-right: 10px;
   color: #394b63;
 }
+.ticket-timeline li span {
+  color: #66758a;
+}
 .ticket-timeline time {
-  color: #8793a3;
+  color: #66758a;
 }
 .ticket-metadata {
   display: grid;

@@ -2,6 +2,7 @@ package com.adria.atlasdesk.ticket;
 
 import java.time.Instant;
 import java.time.Clock;
+import java.util.List;
 import java.util.Locale;
 import com.adria.atlasdesk.asset.Asset;
 import com.adria.atlasdesk.asset.AssetRepository;
@@ -25,15 +26,18 @@ import org.springframework.web.server.ResponseStatusException;
 public class TicketDirectoryService {
 
     private final TicketRepository tickets;
+    private final TicketHistoryRepository history;
     private final OrganizationRepository organizations;
     private final UserRepository users;
     private final AssetRepository assets;
     private final CurrentUserContext currentUser;
     private final Clock clock;
 
-    public TicketDirectoryService(TicketRepository tickets, OrganizationRepository organizations,
+    public TicketDirectoryService(TicketRepository tickets, TicketHistoryRepository history,
+            OrganizationRepository organizations,
             UserRepository users, AssetRepository assets, CurrentUserContext currentUser, Clock clock) {
         this.tickets = tickets;
+        this.history = history;
         this.organizations = organizations;
         this.users = users;
         this.assets = assets;
@@ -59,10 +63,7 @@ public class TicketDirectoryService {
         Instant dueAt = createdAt.plusSeconds((long) slaHours(organization, priority) * 60 * 60);
         Ticket ticket = new Ticket(organization, normalizeRequired(title, "Title"),
                 normalizeRequired(description, "Description"), requester, asset, priority, createdAt, dueAt);
-        Ticket saved = tickets.saveAndFlush(ticket);
-        return tickets.findVisibleSummary(saved.getId(), actor.organizationId(), actor.id(), false)
-                .orElseThrow(TicketNotFoundException::new)
-                .withOverdue(clock.instant());
+        return saveAndRead(ticket, actor, TicketHistoryEventType.CREATED, "Chamado criado", createdAt);
     }
 
     @Transactional(readOnly = true)
@@ -96,8 +97,13 @@ public class TicketDirectoryService {
         if (!agent.isActive() || agent.getRole() != UserRole.AGENT) {
             throw new TicketConflictException("Assignee must be an active agent in the current organization");
         }
+        if (ticket.getAssignedAgent() != null && ticket.getAssignedAgent().getId().equals(agent.getId())) {
+            return readSummary(ticket, actor);
+        }
+        Instant occurredAt = clock.instant();
         ticket.assignTo(agent);
-        return saveAndRead(ticket, actor);
+        return saveAndRead(ticket, actor, TicketHistoryEventType.ASSIGNED,
+                "Responsável atribuído: " + agent.getName(), occurredAt);
     }
 
     @Transactional
@@ -109,8 +115,20 @@ public class TicketDirectoryService {
         boolean requireApproval = command == TicketCommand.RESOLVE
                 && actor.role() == UserRole.AGENT
                 && ticket.getOrganization().isRequireApproval();
-        ticket.transition(command, clock.instant(), requireApproval);
-        return saveAndRead(ticket, actor);
+        Instant occurredAt = clock.instant();
+        ticket.transition(command, occurredAt, requireApproval);
+        return saveAndRead(ticket, actor, historyType(command, requireApproval),
+                historyDescription(command, requireApproval), occurredAt);
+    }
+
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAnyRole('ADMIN', 'AGENT', 'REQUESTER')")
+    public List<TicketHistoryEntry> history(Long ticketId) {
+        AuthenticatedUser actor = currentUser.requireUser();
+        boolean requesterOnly = actor.role() == UserRole.REQUESTER;
+        tickets.findVisibleSummary(ticketId, actor.organizationId(), actor.id(), requesterOnly)
+                .orElseThrow(TicketNotFoundException::new);
+        return history.findTicketHistory(actor.organizationId(), ticketId);
     }
 
     private Ticket findTicket(Long ticketId, AuthenticatedUser actor) {
@@ -118,12 +136,41 @@ public class TicketDirectoryService {
                 .orElseThrow(TicketNotFoundException::new);
     }
 
-    private TicketSummary saveAndRead(Ticket ticket, AuthenticatedUser actor) {
+    private TicketSummary saveAndRead(Ticket ticket, AuthenticatedUser actor, TicketHistoryEventType eventType,
+            String description, Instant occurredAt) {
         Ticket saved = tickets.saveAndFlush(ticket);
+        history.saveAndFlush(new TicketHistoryEvent(actor.organizationId(), saved.getId(), actor.id(), actor.name(),
+                eventType, description, occurredAt, saved.getVersion()));
+        return readSummary(saved, actor);
+    }
+
+    private TicketSummary readSummary(Ticket saved, AuthenticatedUser actor) {
         boolean requesterOnly = actor.role() == UserRole.REQUESTER;
         return tickets.findVisibleSummary(saved.getId(), actor.organizationId(), actor.id(), requesterOnly)
                 .orElseThrow(TicketNotFoundException::new)
                 .withOverdue(clock.instant());
+    }
+
+    private static TicketHistoryEventType historyType(TicketCommand command, boolean requireApproval) {
+        return switch (command) {
+            case START -> TicketHistoryEventType.STARTED;
+            case RESOLVE -> requireApproval
+                    ? TicketHistoryEventType.RESOLUTION_REQUESTED
+                    : TicketHistoryEventType.RESOLVED;
+            case APPROVE -> TicketHistoryEventType.APPROVED;
+            case REJECT -> TicketHistoryEventType.REJECTED;
+            case CLOSE -> TicketHistoryEventType.CLOSED;
+        };
+    }
+
+    private static String historyDescription(TicketCommand command, boolean requireApproval) {
+        return switch (command) {
+            case START -> "Atendimento iniciado";
+            case RESOLVE -> requireApproval ? "Resolução enviada para aprovação" : "Chamado resolvido";
+            case APPROVE -> "Resolução aprovada";
+            case REJECT -> "Resolução rejeitada; voltou para atendimento";
+            case CLOSE -> "Chamado encerrado";
+        };
     }
 
     private static void authorizeTransition(Ticket ticket, AuthenticatedUser actor, TicketCommand command) {

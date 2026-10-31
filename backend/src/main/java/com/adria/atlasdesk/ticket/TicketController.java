@@ -58,6 +58,11 @@ public class TicketController {
         return tickets.get(id);
     }
 
+    @GetMapping("/{id}/history")
+    public List<TicketHistoryEntry> history(@PathVariable @Positive Long id) {
+        return tickets.history(id);
+    }
+
     @PatchMapping("/{id}/assign")
     public TicketSummary assign(@PathVariable @Positive Long id,
             @Valid @RequestBody AssignTicketRequest request) {

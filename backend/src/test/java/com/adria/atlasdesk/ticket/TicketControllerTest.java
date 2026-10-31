@@ -120,6 +120,76 @@ class TicketControllerTest {
     }
 
     @Test
+    void ticketHistoryIsTransactionalOrderedAndRestrictedToVisibleTickets() throws Exception {
+        Organization organization = createOrganization("Ticket history", true);
+        Organization foreignOrganization = createOrganization("Foreign ticket history");
+        User requester = createUser(organization, "History Requester", UserRole.REQUESTER);
+        User otherRequester = createUser(organization, "Other History Requester", UserRole.REQUESTER);
+        User agent = createUser(organization, "History Agent", UserRole.AGENT);
+        User admin = createUser(organization, "History Admin", UserRole.ADMIN);
+        User foreignAdmin = createUser(foreignOrganization, "Foreign History Admin", UserRole.ADMIN);
+        CsrfFixture csrf = fetchCsrf();
+        MockHttpSession requesterSession = login(requester, csrf);
+        MockHttpSession agentSession = login(agent, csrf);
+        MockHttpSession adminSession = login(admin, csrf);
+        MockHttpSession otherRequesterSession = login(otherRequester, csrf);
+        MockHttpSession foreignAdminSession = login(foreignAdmin, csrf);
+
+        MvcResult created = mockMvc.perform(post("/api/tickets").session(requesterSession)
+                        .cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content("{\"title\":\"History lifecycle\",\"description\":\"Trace changes\",\"priority\":\"HIGH\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long ticketId = objectMapper.readTree(created.getResponse().getContentAsByteArray()).get("id").asLong();
+
+        mockMvc.perform(get("/api/tickets/{id}/history", ticketId).session(requesterSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].eventType").value("CREATED"))
+                .andExpect(jsonPath("$[0].actorId").value(requester.getId()))
+                .andExpect(jsonPath("$[0].actorName").value("History Requester"))
+                .andExpect(jsonPath("$[0].description").value("Chamado criado"))
+                .andExpect(jsonPath("$[0].occurredAt").isNotEmpty());
+
+        mockMvc.perform(patch("/api/tickets/{id}/assign", ticketId).session(adminSession)
+                        .cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content("{\"assignedAgentId\":" + agent.getId() + "}"))
+                .andExpect(status().isOk());
+        performTransition(ticketId, agentSession, csrf, "START").andExpect(status().isOk());
+        performTransition(ticketId, agentSession, csrf, "START").andExpect(status().isConflict());
+        mockMvc.perform(get("/api/tickets/{id}/history", ticketId).session(requesterSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        performTransition(ticketId, agentSession, csrf, "RESOLVE").andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_APPROVAL"));
+        performTransition(ticketId, adminSession, csrf, "REJECT").andExpect(status().isOk());
+        performTransition(ticketId, agentSession, csrf, "RESOLVE").andExpect(status().isOk());
+        performTransition(ticketId, adminSession, csrf, "APPROVE").andExpect(status().isOk());
+        performTransition(ticketId, requesterSession, csrf, "CLOSE").andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/tickets/{id}/history", ticketId).session(requesterSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(8))
+                .andExpect(jsonPath("$[0].eventType").value("CREATED"))
+                .andExpect(jsonPath("$[1].eventType").value("ASSIGNED"))
+                .andExpect(jsonPath("$[1].actorName").value("History Admin"))
+                .andExpect(jsonPath("$[2].eventType").value("STARTED"))
+                .andExpect(jsonPath("$[2].actorName").value("History Agent"))
+                .andExpect(jsonPath("$[3].eventType").value("RESOLUTION_REQUESTED"))
+                .andExpect(jsonPath("$[4].eventType").value("REJECTED"))
+                .andExpect(jsonPath("$[5].eventType").value("RESOLUTION_REQUESTED"))
+                .andExpect(jsonPath("$[6].eventType").value("APPROVED"))
+                .andExpect(jsonPath("$[7].eventType").value("CLOSED"))
+                .andExpect(jsonPath("$[7].actorId").value(requester.getId()));
+        mockMvc.perform(get("/api/tickets/{id}/history", ticketId).session(otherRequesterSession))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/tickets/{id}/history", ticketId).session(foreignAdminSession))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void requesterSeesOnlyOwnTicketsWhileAgentAndAdminSeeOrganizationTickets() throws Exception {
         Organization organization = createOrganization("Ticket role scope");
         User requester = createUser(organization, "Requester One", UserRole.REQUESTER);
@@ -525,6 +595,13 @@ class TicketControllerTest {
         };
         return tickets.saveAndFlush(new Ticket(organization, title, "Request description", requester, null,
                 priority, now, now.plusSeconds((long) hours * 3600)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions performTransition(long ticketId,
+            MockHttpSession session, CsrfFixture csrf, String command) throws Exception {
+        return mockMvc.perform(post("/api/tickets/{id}/transition", ticketId).session(session)
+                .cookie(csrf.cookie()).header(csrf.headerName(), csrf.token())
+                .contentType("application/json").content("{\"command\":\"" + command + "\"}"));
     }
 
     private CsrfFixture fetchCsrf() throws Exception {

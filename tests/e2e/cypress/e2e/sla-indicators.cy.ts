@@ -88,6 +88,10 @@ function openTicket(
     statusCode: 200,
     body: ticket(id, status, dueAt, overdue),
   });
+  cy.intercept("GET", `/api/tickets/${id}/history`, {
+    statusCode: 200,
+    body: [],
+  });
   cy.visit(`/tickets/${id}`);
   cy.contains("h1", `Ticket ${id}`).should("be.visible");
 }
