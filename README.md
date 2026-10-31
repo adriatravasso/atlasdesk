@@ -55,6 +55,8 @@ Without `DEV_ADMIN_PASSWORD`, the invalid-credentials smoke check still runs and
 
 User administration is available to ADMIN sessions at `GET /api/users?page=0&size=20`, `POST /api/users`, and `PATCH /api/users/{id}`. Create requests require `name`, `email`, `role`, and `password`; `active` defaults to `true`. PATCH accepts only supplied fields. Send the CSRF cookie and token header for POST/PATCH. User queries and changes always use the authenticated session's organization; password hashes are never returned, and the last active ADMIN cannot be deactivated or demoted.
 
+Assets are available at `GET /api/assets?page=0&size=20`, `POST /api/assets`, and `PATCH /api/assets/{id}`. Listing supports `search` (asset number or name), `type`, and `status` (`ACTIVE` or `INACTIVE`). ADMIN, AGENT, and REQUESTER sessions can list assets from their own organization; ADMIN and AGENT can create and update them. Create requests require `assetNumber`, `name`, and `type`; `description` is optional and `status` defaults to `ACTIVE`. PATCH accepts supplied fields, with an empty `description` clearing it. Asset numbers are unique without regard to case within each organization. The API derives organization scope from the session and does not accept organization IDs from clients.
+
 Named volumes preserve PostgreSQL data and Maven, npm, Cypress, frontend dependency, E2E dependency, and backend build caches across container restarts. The example database credentials are for local development only. Set matching `POSTGRES_*` and `DB_*` values in `.env` when changing them.
 
 Build the application images or follow service logs when needed:
@@ -100,6 +102,7 @@ This stops and removes the containers while preserving named volumes and local d
 - Spring Boot API with `GET /api/health`, returning `{"status":"UP","service":"atlasdesk-api"}`.
 - PostgreSQL datasource configuration and Flyway integration.
 - A web MVC test for the health endpoint.
+- Organization-scoped asset API with paginated filters, ADMIN/AGENT writes, and PostgreSQL uniqueness for asset numbers.
 - React authenticated shell, session restoration, login/logout, role-protected user directory, and Vite API proxy.
 - PostgreSQL 16, backend, and frontend Compose services with health checks, service dependencies, bind mounts, and persistent caches.
 - Production image stages for the backend and frontend Dockerfiles.
@@ -107,4 +110,4 @@ This stops and removes the containers while preserving named volumes and local d
 
 ## Planned
 
-Support tickets, IT assets, configurable SLAs, optional resolution approval, operational dashboards, broader end-to-end coverage, and Jenkins CI are planned for later tasks.
+Support tickets, asset management UI, configurable SLAs, optional resolution approval, operational dashboards, broader end-to-end coverage, and Jenkins CI are planned for later tasks.
