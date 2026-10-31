@@ -9,6 +9,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.adria.atlasdesk.security.PasswordEncodingConfiguration;
 import com.adria.atlasdesk.user.User;
@@ -50,7 +51,7 @@ class OrganizationUserPersistenceTest {
                     assertThat(saved.getCreatedAt()).isNotNull();
                     assertThat(saved.getUpdatedAt()).isNotNull();
                 });
-        assertThat(users.findAllByOrganizationId(firstOrganization.getId()))
+        assertThat(users.findAllByOrganizationId(firstOrganization.getId(), PageRequest.of(0, 20)).getContent())
                 .extracting(User::getId)
                 .containsExactly(firstUser.getId());
         assertThat(users.findByOrganizationIdAndEmailIgnoreCase(firstOrganization.getId(), "ADA@EXAMPLE.TEST"))

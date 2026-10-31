@@ -24,6 +24,31 @@ describe("Real authentication and session authorization", () => {
     });
   });
 
+  it("does not follow an external return path after login", () => {
+    loadAccounts().then(({ organizationId, admin, password }) => {
+      cy.visit("/login", {
+        onBeforeLoad(window) {
+          window.history.replaceState(
+            {
+              usr: { from: { pathname: "//attacker.example" } },
+              key: "external-return-path",
+              idx: 0,
+            },
+            "",
+            "/login",
+          );
+        },
+      });
+      cy.get("#organizationId").type(String(organizationId));
+      cy.get("#email").type(admin);
+      cy.get("#password").type(password);
+      cy.contains("button", "Entrar").click();
+      cy.location("origin").should("eq", Cypress.config("baseUrl"));
+      cy.location("pathname").should("eq", "/");
+      cy.contains("h1", "Visão da organização").should("be.visible");
+    });
+  });
+
   it("returns unauthorized for protected API routes without a session", () => {
     cy.request({
       method: "GET",

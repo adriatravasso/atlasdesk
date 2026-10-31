@@ -175,6 +175,7 @@ class AuthenticationControllerTest {
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsByteArray());
         Cookie cookie = result.getResponse().getCookie("XSRF-TOKEN");
         assertThat(cookie).isNotNull();
+        assertThat(cookie.isHttpOnly()).isTrue();
         return new CsrfFixture(body.get("headerName").asText(), body.get("token").asText(), cookie);
     }
 

@@ -616,9 +616,10 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const checkedInitialSession = useRef(false);
-  const from =
-    (location.state as { from?: { pathname?: string } } | null)?.from
-      ?.pathname ?? "/";
+  const from = safeInternalPath(
+    (location.state as { from?: { pathname?: unknown } } | null)?.from
+      ?.pathname,
+  );
   useEffect(() => {
     if (loading || checkedInitialSession.current) return;
     checkedInitialSession.current = true;
@@ -1094,7 +1095,7 @@ function UsersPage() {
               </table>
             </div>
           )}
-          <div className="pagination" aria-label="Paginação de usuários">
+          <nav className="pagination" aria-label="Paginação de usuários">
             <span>
               Página {visiblePage} de {Math.max(totalPages, 1)}
             </span>
@@ -1114,7 +1115,7 @@ function UsersPage() {
                 Próxima
               </button>
             </div>
-          </div>
+          </nav>
         </div>
       )}
     </section>
@@ -1357,7 +1358,7 @@ function TicketsPage() {
               </table>
             </div>
           )}
-          <div className="pagination" aria-label="Paginação de chamados">
+          <nav className="pagination" aria-label="Paginação de chamados">
             <span>
               Página {totalPages === 0 ? 0 : pageNumber + 1} de{" "}
               {Math.max(totalPages, 1)}
@@ -1385,7 +1386,7 @@ function TicketsPage() {
                 Próxima
               </button>
             </div>
-          </div>
+          </nav>
         </div>
       )}
     </section>
@@ -2429,7 +2430,7 @@ function AssetsPage() {
               </table>
             </div>
           )}
-          <div className="pagination" aria-label="Paginação de ativos">
+          <nav className="pagination" aria-label="Paginação de ativos">
             <span>
               Página {page.totalPages === 0 ? 0 : pageNumber + 1} de{" "}
               {Math.max(totalPages, 1)}
@@ -2450,7 +2451,7 @@ function AssetsPage() {
                 Próxima
               </button>
             </div>
-          </div>
+          </nav>
         </div>
       )}
     </section>
@@ -2461,6 +2462,24 @@ function roleName(role: UserRole) {
   return { ADMIN: "Administrador", AGENT: "Agente", REQUESTER: "Solicitante" }[
     role
   ];
+}
+
+function safeInternalPath(value: unknown) {
+  if (
+    typeof value !== "string" ||
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\")
+  ) {
+    return "/";
+  }
+
+  try {
+    const target = new URL(value, window.location.origin);
+    return target.origin === window.location.origin ? target.pathname : "/";
+  } catch {
+    return "/";
+  }
 }
 
 export default App;

@@ -13,7 +13,7 @@
   -webkit-font-smoothing: antialiased;
   --navy: #19365b;
   --blue: #315c91;
-  --muted: #728096;
+  --muted: #586980;
   --line: #e6eaf0;
   --green: #2c805e;
 }
@@ -38,8 +38,10 @@ button {
 }
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
-  outline: 3px solid #91b7e4;
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #315c91;
   outline-offset: 2px;
 }
 .app-shell {
@@ -82,7 +84,7 @@ input:focus-visible {
 }
 .nav-label {
   margin: 49px 10px 12px;
-  color: #9aa5b4;
+  color: #586980;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -113,7 +115,7 @@ input:focus-visible {
   gap: 9px;
   margin-top: auto;
   padding: 12px;
-  color: #8290a2;
+  color: #586980;
   font-size: 11px;
 }
 .workspace-dot,
@@ -149,7 +151,7 @@ input:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #56836f;
+  color: #2f6b4f;
   font-size: 11px;
   font-weight: 600;
 }
@@ -182,7 +184,7 @@ input:focus-visible {
   white-space: nowrap;
 }
 .user-copy small {
-  color: #8793a3;
+  color: #586980;
   font-size: 10px;
 }
 .mobile-brand {
@@ -248,7 +250,7 @@ input:focus-visible {
 }
 .eyebrow {
   margin: 0 0 12px;
-  color: #6f86a5;
+  color: #586980;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.15em;
@@ -265,7 +267,7 @@ input:focus-visible {
 }
 .page-lead {
   margin: 11px 0 30px;
-  color: #7b8798;
+  color: #586980;
   font-size: 14px;
   line-height: 1.7;
 }
@@ -287,7 +289,7 @@ input:focus-visible {
   place-items: center;
   border-radius: 10px;
   background: #edf6f1;
-  color: #39845f;
+  color: #2e6d4e;
   font-weight: 700;
 }
 .welcome-card h2,
@@ -301,7 +303,7 @@ input:focus-visible {
 .welcome-card p {
   max-width: 580px;
   margin: 0;
-  color: #7b8798;
+  color: #586980;
   font-size: 13px;
   line-height: 1.7;
 }
@@ -416,7 +418,7 @@ input:focus-visible {
 }
 .dashboard-panel-heading > span {
   flex: none;
-  color: #7b8798;
+  color: #586980;
   font-size: 11px;
 }
 .priority-bars {
@@ -463,7 +465,7 @@ input:focus-visible {
 }
 .quiet-note {
   margin: 19px 0;
-  color: #99a3b1;
+  color: #586980;
   font-size: 11px;
 }
 .notice {
@@ -503,7 +505,7 @@ input:focus-visible {
   margin: 0;
 }
 .table-heading span {
-  color: #8a96a5;
+  color: #586980;
   font-size: 11px;
 }
 .table-scroll {
@@ -518,7 +520,7 @@ table {
 th {
   height: 42px;
   background: #fafbfd;
-  color: #8490a0;
+  color: #586980;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -541,24 +543,24 @@ tbody tr:last-child td {
   padding: 4px 8px;
   border-radius: 99px;
   background: #f1f2f4;
-  color: #8a929e;
+  color: #586980;
   font-size: 10px;
   font-weight: 600;
 }
 .status-tag--active {
   background: #eef7f1;
-  color: #39815e;
+  color: #2e6d4e;
 }
 .empty-state {
   padding: 24px;
-  color: #7b8798;
+  color: #586980;
   font-size: 13px;
 }
 .status-page {
   display: grid;
   min-height: 100vh;
   place-items: center;
-  color: #718096;
+  color: #586980;
   font-size: 13px;
 }
 .login-page {
@@ -615,7 +617,7 @@ tbody tr:last-child td {
 }
 .login-footnote {
   margin: 21px 0 0;
-  color: #9aa4b1;
+  color: #586980;
   text-align: center;
   font-size: 10px;
 }
@@ -873,7 +875,7 @@ tbody tr:last-child td {
   gap: 12px;
   padding: 0 18px;
   border-top: 1px solid var(--line);
-  color: #8490a0;
+  color: #586980;
   font-size: 11px;
 }
 .pagination > div {
@@ -1073,7 +1075,7 @@ tbody tr:last-child td {
   gap: 12px;
   margin: 0;
   padding: 0 0 0 19px;
-  color: #7b8798;
+  color: #586980;
   font-size: 12px;
 }
 .ticket-timeline li {
@@ -1108,7 +1110,7 @@ tbody tr:last-child td {
 }
 .ticket-metadata dt {
   margin-bottom: 6px;
-  color: #8793a3;
+  color: #586980;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1134,12 +1136,12 @@ tbody tr:last-child td {
 }
 .settings-help {
   margin: 18px 0 0;
-  color: #7b8798;
+  color: #586980;
   font-size: 12px;
   line-height: 1.6;
 }
 .asset-filters input::placeholder {
-  color: #a1aab6;
+  color: #586980;
   font-weight: 400;
 }
 .user-form-grid .asset-description-field {
