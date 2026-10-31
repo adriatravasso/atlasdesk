@@ -1,6 +1,6 @@
 # AtlasDesk E2E tests
 
-The Cypress project is run in the `e2e` Docker Compose profile. It verifies invalid credentials and, when configured, real login, session reload, protected user access, ticket creation/list/detail, and the agent/requester handling flow through closure. No local Node.js, npm, or Cypress installation is needed.
+The Cypress project is run in the `e2e` Docker Compose profile. It verifies invalid credentials and, when configured, real login, session reload, protected user access, ticket creation/list/detail, and the agent/requester handling flow through closure. A browser API-intercept spec also covers agent resolution requests, administrator approval/rejection, and hidden review actions for non-admin roles without modifying database records. No local Node.js, npm, or Cypress installation is needed.
 
 From the repository root, start the application and run the smoke test:
 

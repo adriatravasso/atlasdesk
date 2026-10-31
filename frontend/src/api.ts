@@ -164,7 +164,8 @@ export type AssetPage = {
 export type TicketStatus =
   "OPEN" | "IN_PROGRESS" | "PENDING_APPROVAL" | "RESOLVED" | "CLOSED";
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH";
-export type TicketCommand = "START" | "RESOLVE" | "CLOSE";
+export type TicketCommand =
+  "START" | "RESOLVE" | "APPROVE" | "REJECT" | "CLOSE";
 
 export type Ticket = {
   id: number;
