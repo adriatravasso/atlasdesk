@@ -54,6 +54,12 @@ pipeline {
             }
         }
 
+        stage('Cypress typecheck') {
+            steps {
+                sh 'docker compose --profile e2e run --rm --entrypoint sh e2e -c "npm ci --prefer-offline && npm run typecheck"'
+            }
+        }
+
         stage('Start isolated services') {
             steps {
                 sh 'docker compose --profile e2e up -d --wait e2e-db e2e-backend e2e-frontend'
@@ -68,7 +74,7 @@ pipeline {
 
         stage('Collect reports') {
             steps {
-                archiveArtifacts artifacts: 'backend/.ci-reports/surefire-reports/**/*.xml,tests/e2e/cypress/screenshots/**/*,tests/e2e/cypress/videos/**/*', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'backend/.ci-reports/surefire-reports/**/*.xml,docs/screenshots/**/*.png,tests/e2e/cypress/screenshots/**/*,tests/e2e/cypress/videos/**/*', allowEmptyArchive: true
             }
         }
 
@@ -81,7 +87,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'backend/.ci-reports/surefire-reports/**/*.xml,tests/e2e/cypress/screenshots/**/*,tests/e2e/cypress/videos/**/*', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'backend/.ci-reports/surefire-reports/**/*.xml,docs/screenshots/**/*.png,tests/e2e/cypress/screenshots/**/*,tests/e2e/cypress/videos/**/*', allowEmptyArchive: true
             sh 'docker compose --profile e2e down --remove-orphans'
         }
     }
