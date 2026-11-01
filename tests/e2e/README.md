@@ -1,78 +1,41 @@
 # AtlasDesk Cypress E2E
 
-The Cypress project uses the `e2e` Compose profile and a separate Compose project name. Its PostgreSQL named volume is independent of the manual demonstration project's `postgres_data` volume. The E2E seeder and `POST /api/e2e/reset` exist only with the backend's `e2e` Spring profile. Cypress resets only this disposable database before each spec/test through `cypress/support/e2e.ts`.
-
-The fixed synthetic test identities in `cypress/fixtures/accounts.json` are for the E2E database only. The local demo uses separate accounts and a password in the ignored `.env.demo`; never reuse E2E credentials outside tests.
-
-## Start E2E services
-
-From the repository root, start the test-only database, API, and frontend. Their application traffic uses Compose service names; the frontend is optionally exposed at `localhost:5174` for manual inspection.
+Run the full headless suite from the repository root:
 
 ```powershell
-docker compose -p atlasdesk-e2e --profile e2e config --quiet
-docker compose -p atlasdesk-e2e --profile e2e up -d --build --wait e2e-db e2e-backend e2e-frontend
-docker compose -p atlasdesk-e2e --profile e2e ps
+docker compose --profile e2e run --rm e2e
 ```
 
-Run the complete suite headlessly:
+Compose starts a dedicated PostgreSQL service, backend, and frontend for Cypress. These services use the internal Docker network and do not publish ports. They never connect to the development `db`, `backend`, or `frontend` services. The test database is stored in `e2e_postgres_data`; the E2E profile resets only this database before each test and seeds two organizations with fixed local test users. The test password and accounts in `cypress/fixtures/accounts.json` are synthetic and must never be used outside this isolated environment.
+
+The suite covers invalid and valid login, session restore/logout, protected API access, user and asset administration, organization authorization boundaries, ticket creation, priority SLA snapshots, assignment, workflow, resolution approval, history, dashboard metrics, and organization separation. Browser flows exercise the real frontend and backend; a small set of UI-only error/loading cases use API interception. `portfolio-screenshots.cy.ts` is an end-to-end walkthrough against the same real services; it resets only the E2E database and captures real browser screenshots into the repository's `docs/screenshots/` directory.
+
+Source, fixtures, configuration, and the npm lockfile live under `tests/e2e`. The E2E directory is bind-mounted. Cypress screenshots are written through a dedicated bind mount to `docs/screenshots/`; videos and JUnit reports are saved under `tests/e2e/artifacts/`. Node.js, npm, Chrome, and Cypress run inside the test container, with npm and Cypress caches in named volumes.
+
+For headed browser validation, the Cypress image includes Xvfb, x11vnc, and noVNC. Compose exposes the viewer only on the local machine:
 
 ```powershell
-docker compose -p atlasdesk-e2e --profile e2e run --rm e2e
+docker compose --profile e2e run --rm --service-ports e2e visual
 ```
 
-Run one spec headlessly:
+Open <http://localhost:6080/vnc.html> while Cypress runs. To open Cypress interactively and select a spec:
 
 ```powershell
-docker compose -p atlasdesk-e2e --profile e2e run --rm e2e headless --spec cypress/e2e/authentication.cy.ts
+docker compose --profile e2e run --rm --service-ports e2e interactive
 ```
 
-## Watch Cypress in the browser
+The suite writes JUnit reports and videos to `tests/e2e/artifacts/`. The portfolio walkthrough writes its committed screenshots to `docs/screenshots/`.
 
-The test image extends the official Cypress browser image with Xvfb, x11vnc, and noVNC. The VNC protocol remains inside the test container; Compose publishes the noVNC web port on `127.0.0.1` only.
-
-Run all specs sequentially in a visible Chrome browser:
+To regenerate only the portfolio images from the repository root:
 
 ```powershell
-docker compose -p atlasdesk-e2e --profile e2e run --rm --service-ports e2e visual
+docker compose --profile e2e run --rm --entrypoint sh e2e -c "npm ci --prefer-offline && npx cypress run --browser chrome --spec cypress/e2e/portfolio-screenshots.cy.ts"
 ```
 
-Open <http://localhost:6080/vnc.html> while the command is running. A single headed spec can be watched with:
+Type-check the Cypress project in its container:
 
 ```powershell
-docker compose -p atlasdesk-e2e --profile e2e run --rm --service-ports e2e visual --spec cypress/e2e/authentication.cy.ts
+docker compose --profile e2e run --rm --entrypoint sh e2e -c "npm ci --prefer-offline && npm run typecheck"
 ```
 
-For interactive Cypress Open, where a spec can be selected and debugged:
-
-```powershell
-docker compose -p atlasdesk-e2e --profile e2e run --rm --service-ports e2e interactive
-```
-
-Open <http://localhost:6080/vnc.html> and use the Cypress desktop. This process remains attached until Cypress Open is closed or stopped with Ctrl+C.
-
-## Evidence and validation
-
-Headless and headed `cypress run` both emit JUnit XML reports and per-spec MP4 videos. Cypress stores screenshots when a test fails. All artifacts go into `tests/e2e/artifacts/`, which is ignored by Git and remains available on the host after the runner exits.
-
-```text
-tests/e2e/artifacts/
-  reports/       results-<hash>.xml
-  screenshots/   failure screenshots
-  videos/        Cypress spec recordings
-```
-
-Type-check Cypress in its container:
-
-```powershell
-docker compose -p atlasdesk-e2e --profile e2e run --rm --entrypoint sh e2e -c "npm ci --prefer-offline && npm run typecheck"
-```
-
-The existing real browser suite covers login/logout/session authorization, ticket create/list/detail/filter and workflow transitions, conditional resolution approval, history, dashboard metrics, asset and user administration, organization settings, permission checks, and organization isolation. It uses the real Compose frontend, API, and PostgreSQL database. There are no external API dependencies.
-
-Stop E2E containers while preserving its test data and dependency caches:
-
-```powershell
-docker compose -p atlasdesk-e2e --profile e2e stop
-```
-
-The stopped project is safe to start again. Do not run `docker compose down -v`; this task never needs volume deletion or a Docker-wide cleanup.
+Do not run `docker compose down -v`; the named development and E2E database volumes are persisted independently.

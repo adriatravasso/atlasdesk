@@ -5,7 +5,7 @@ export default defineConfig({
     baseUrl: "http://e2e-frontend:5173",
     specPattern: "cypress/e2e/**/*.cy.ts",
     supportFile: "cypress/support/e2e.ts",
-    screenshotsFolder: "artifacts/screenshots",
+    screenshotsFolder: "/screenshots",
     videosFolder: "artifacts/videos",
     video: true,
     screenshotOnRunFailure: true,

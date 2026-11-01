@@ -1,0 +1,39 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:3}
+      minimum-idle: 0
+      connection-timeout: 5000
+      validation-timeout: 3000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    baseline-on-migrate: false
+    out-of-order: false
+
+server:
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true
+        same-site: lax
+
+app:
+  security:
+    cookie-secure: true
+  demo:
+    admin-password: ${DEMO_ADMIN_PASSWORD:}
+    admin-email: ${DEMO_ADMIN_EMAIL:atlasdesk-demo@example.invalid}
+    organization-name: ${DEMO_ORGANIZATION_NAME:AtlasDesk Public Demo}
+
+logging:
+  level:
+    root: INFO
