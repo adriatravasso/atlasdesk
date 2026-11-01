@@ -121,16 +121,24 @@ describe("Live ticket workflow, SLA, approval, history and dashboard", () => {
       cy.get('textarea[name="description"]').type("Organization isolation check.");
       cy.get('select[name="priority"]').select("MEDIUM");
       cy.contains("button", "Abrir chamado").click();
-      cy.location("pathname").then((path) => {
-        const ticketId = path.split("/").pop();
-        loginThroughUi(otherOrganizationId, otherAdmin, password, "/");
-        cy.request({ method: "GET", url: `/api/tickets/${ticketId}`, failOnStatusCode: false })
-          .its("status").should("eq", 404);
-        cy.request<{ totalTickets: number }>("GET", "/api/dashboard")
-          .its("body.totalTickets").should("eq", 0);
-        cy.visit("/tickets");
-        cy.contains(title).should("not.exist");
-      });
+      cy.location("pathname")
+        .should("match", /^\/tickets\/\d+$/)
+        .then((path) => {
+          const ticketId = path.split("/").pop();
+          loginThroughUi(otherOrganizationId, otherAdmin, password, "/");
+          cy.request({
+            method: "GET",
+            url: `/api/tickets/${ticketId}`,
+            failOnStatusCode: false,
+          })
+            .its("status")
+            .should("eq", 404);
+          cy.request<{ totalTickets: number }>("GET", "/api/dashboard")
+            .its("body.totalTickets")
+            .should("eq", 0);
+          cy.visit("/tickets");
+          cy.contains(title).should("not.exist");
+        });
     });
   });
 });

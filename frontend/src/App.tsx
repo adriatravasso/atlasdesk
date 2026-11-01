@@ -31,58 +31,95 @@ import {
   type UserPage,
   type UserRole,
 } from "./api";
-import { AuthProvider } from "./AuthContext";
+import { useBackendStatus } from "./useBackendStatus";
+import { useRefreshOnBackendReady } from "./useRefreshOnBackendReady";
 import { useAuth } from "./useAuth";
 
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<ProtectedLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="tickets" element={<TicketsPage />} />
-            <Route path="tickets/new" element={<TicketCreatePage />} />
-            <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
-            <Route
-              path="assets"
-              element={
-                <RoleRoute roles={["ADMIN", "AGENT", "REQUESTER"]}>
-                  <AssetsPage />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="users"
-              element={
-                <RoleRoute roles={["ADMIN"]}>
-                  <UsersPage />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <RoleRoute roles={["ADMIN"]}>
-                  <SettingsPage />
-                </RoleRoute>
-              }
-            />
-            <Route path="forbidden" element={<ForbiddenPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<ProtectedLayout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="tickets" element={<TicketsPage />} />
+          <Route path="tickets/new" element={<TicketCreatePage />} />
+          <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
+          <Route
+            path="assets"
+            element={
+              <RoleRoute roles={["ADMIN", "AGENT", "REQUESTER"]}>
+                <AssetsPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="users"
+            element={
+              <RoleRoute roles={["ADMIN"]}>
+                <UsersPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <RoleRoute roles={["ADMIN"]}>
+                <SettingsPage />
+              </RoleRoute>
+            }
+          />
+          <Route path="forbidden" element={<ForbiddenPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }
 
 function LoadingPage() {
+  const { status, retry } = useBackendStatus();
   return (
-    <main className="status-page" role="status">
-      Verificando sua sessão…
+    <main className="status-page">
+      <DemoStatusNotice status={status} retry={retry} />
+      <p role="status">Verificando sua sessão…</p>
     </main>
+  );
+}
+
+function DemoStatusNotice({
+  status,
+  retry,
+}: {
+  status: ReturnType<typeof useBackendStatus>["status"];
+  retry: () => void;
+}) {
+  return (
+    <section className="demo-notice" aria-label="Status da demonstração">
+      <p>
+        Esta é uma versão demonstrativa gratuita do AtlasDesk. O servidor pode
+        levar cerca de um minuto para iniciar após um período de inatividade.
+      </p>
+      <div className="demo-status-row" role="status" aria-live="polite">
+        <span
+          className={`demo-status-dot demo-status-dot--${status}`}
+          aria-hidden="true"
+        />
+        <span>
+          {status === "ready" && "Sistema pronto para uso."}
+          {status === "checking" && "Verificando disponibilidade do servidor…"}
+          {status === "starting" &&
+            "Servidor inicializando. Aguarde alguns instantes…"}
+          {status === "offline" &&
+            "Servidor indisponível no momento. Tente novamente em instantes."}
+        </span>
+        {status !== "ready" && (
+          <button className="text-button" type="button" onClick={retry}>
+            Tentar novamente
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -121,6 +158,7 @@ function Shell({
   children: React.ReactNode;
 }) {
   const { signOut } = useAuth();
+  const { status, retry } = useBackendStatus();
   const navigate = useNavigate();
   const [logoutError, setLogoutError] = useState<string | null>(null);
   async function handleLogout() {
@@ -152,17 +190,20 @@ function Shell({
           )}
         </nav>
         <div className="sidebar-foot">
-          <span className="workspace-dot" />{" "}
-          {user.organizationId
-            ? `Organização ${user.organizationId}`
-            : "Espaço de trabalho"}
-          <span className="app-version">v0.0.1</span>
+          <span className="workspace-label">
+            <span className="workspace-dot" />
+            {user.organizationId
+              ? `Organização ${user.organizationId}`
+              : "Espaço de trabalho"}
+          </span>
+          <span className="app-version">AtlasDesk · v{__APP_VERSION__}</span>
         </div>
       </aside>
       <div className="main-column">
         <header className="app-header">
           <div className="mobile-brand">
             <span className="brand-mark">A</span> AtlasDesk
+            <span className="app-version">v{__APP_VERSION__}</span>
           </div>
           <div className="header-spacer" />
           <span className="session-pill">
@@ -181,6 +222,7 @@ function Shell({
             Sair
           </button>
         </header>
+        <DemoStatusNotice status={status} retry={retry} />
         {error && (
           <div className="notice notice--warning" role="status">
             {error}
@@ -212,6 +254,7 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  useRefreshOnBackendReady(() => setReloadToken((token) => token + 1));
 
   useEffect(() => {
     let active = true;
@@ -437,6 +480,7 @@ function SettingsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  useRefreshOnBackendReady(() => setReloadToken((token) => token + 1));
 
   useEffect(() => {
     let active = true;
@@ -609,6 +653,7 @@ function SettingsPage() {
 
 function LoginPage() {
   const { user, loading, setUser, error: sessionError } = useAuth();
+  const backend = useBackendStatus();
   const location = useLocation();
   const navigate = useNavigate();
   const [organizationId, setOrganizationId] = useState("");
@@ -626,8 +671,6 @@ function LoginPage() {
     checkedInitialSession.current = true;
     if (user) navigate("/", { replace: true });
   }, [loading, user, navigate]);
-  if (loading) return <LoadingPage />;
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -653,6 +696,7 @@ function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-panel" aria-labelledby="login-title">
+        <DemoStatusNotice status={backend.status} retry={backend.retry} />
         <Link className="brand login-brand" to="/" aria-label="AtlasDesk">
           <span className="brand-mark">A</span>
           <span>AtlasDesk</span>
@@ -707,9 +751,13 @@ function LoginPage() {
           <button
             className="button button--primary button--wide"
             type="submit"
-            disabled={busy}
+            disabled={busy || backend.status !== "ready"}
           >
-            {busy ? "Entrando…" : "Entrar"}
+            {busy
+              ? "Entrando…"
+              : backend.status === "ready"
+                ? "Entrar"
+                : "Aguardando servidor…"}
           </button>
         </form>
         <p className="login-footnote">
@@ -732,6 +780,7 @@ function UsersPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
+  useRefreshOnBackendReady(() => setReloadToken((token) => token + 1));
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -1139,6 +1188,7 @@ function TicketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  useRefreshOnBackendReady(() => setReloadToken((token) => token + 1));
   const queryKey = searchParams.toString();
 
   useEffect(() => {
@@ -1396,11 +1446,13 @@ function TicketsPage() {
 
 function TicketCreatePage() {
   const navigate = useNavigate();
+  const [assetReloadToken, setAssetReloadToken] = useState(0);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(true);
   const [assetError, setAssetError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useRefreshOnBackendReady(() => setAssetReloadToken((token) => token + 1));
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -1426,7 +1478,7 @@ function TicketCreatePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [assetReloadToken]);
 
   async function createTicket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1574,6 +1626,7 @@ function TicketDetailPage() {
     (location.state as { notice?: string } | null)?.notice ?? null,
   );
   const [reloadToken, setReloadToken] = useState(0);
+  useRefreshOnBackendReady(() => setReloadToken((token) => token + 1));
   const [busyAction, setBusyAction] = useState<"assign" | TicketCommand | null>(
     null,
   );
@@ -2008,6 +2061,7 @@ function AssetsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyAssetId, setBusyAssetId] = useState<number | null>(null);
+  useRefreshOnBackendReady(() => setReloadToken((token) => token + 1));
   const [form, setForm] = useState({
     assetNumber: "",
     name: "",

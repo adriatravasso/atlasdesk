@@ -31,8 +31,9 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       APP_DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
     ports:
-      - "8080:8080"
+      - "${BACKEND_HOST_PORT:-8080}:8080"
     volumes:
       - ./backend:/workspace/backend
       - maven_cache:/root/.m2
@@ -58,7 +59,7 @@ services:
     environment:
       VITE_API_TARGET: http://backend:8080
     ports:
-      - "5173:5173"
+      - "${FRONTEND_HOST_PORT:-5173}:5173"
     volumes:
       - ./frontend:/workspace/frontend
       - frontend_node_modules:/workspace/frontend/node_modules
@@ -76,17 +77,19 @@ services:
       start_period: 20s
 
   e2e:
-    image: cypress/browsers:22.15.0
+    build:
+      context: .
+      dockerfile: tests/e2e/Dockerfile
     profiles: ["e2e"]
     working_dir: /e2e
-    entrypoint: ["sh", "-c"]
-    command: ["npm ci --prefer-offline && npx cypress run --browser chrome"]
+    command: ["headless"]
     environment:
       CYPRESS_CACHE_FOLDER: /root/.cache/Cypress
       TZ: America/Manaus
       CYPRESS_BASE_URL: http://e2e-frontend:5173
     volumes:
       - ./tests/e2e:/e2e
+      - ./docs/screenshots:/screenshots
       - e2e_node_modules:/e2e/node_modules
       - e2e_npm_cache:/root/.npm
       - cypress_cache:/root/.cache/Cypress
@@ -95,6 +98,8 @@ services:
         condition: service_healthy
     networks:
       - atlasdesk
+    ports:
+      - "127.0.0.1:${E2E_VISUAL_HOST_PORT:-6080}:6080"
 
   e2e-db:
     image: postgres:16-alpine
@@ -153,6 +158,8 @@ services:
       - ./frontend:/workspace/frontend
       - frontend_node_modules:/workspace/frontend/node_modules
       - npm_cache:/root/.npm
+    ports:
+      - "127.0.0.1:${E2E_FRONTEND_HOST_PORT:-5174}:5173"
     depends_on:
       e2e-backend:
         condition: service_healthy

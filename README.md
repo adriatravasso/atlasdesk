@@ -1,138 +1,203 @@
 # AtlasDesk
 
-AtlasDesk is an IT service management application foundation for managing support services and technology assets.
+AtlasDesk is a multi-tenant IT service desk for tracking support tickets, technology assets, service-level deadlines, and resolution approvals. It is a portfolio and development project designed to run locally with Docker Compose.
 
-## Stack
+## Product tour
 
-- Backend: Java 21, Spring Boot 3.5, Spring MVC, Spring Data JPA, Hibernate, Jakarta Validation, PostgreSQL JDBC, Flyway, Maven Wrapper, JUnit 5.
-- Frontend: React 18.3.1, React DOM 18.3.1, TypeScript strict mode, Vite, ESLint, Prettier, native CSS.
-- Database: PostgreSQL 16 with Docker Compose.
-- End-to-end: Cypress 15 in [`tests/e2e`](tests/e2e/README.md), run through the optional Docker Compose `e2e` profile.
-- CI: Jenkins Declarative Pipeline in the root [`Jenkinsfile`](Jenkinsfile), using a Docker-enabled agent.
+The current application includes:
 
-## Architecture
+- Organization-scoped login, session restoration, logout, and role-aware navigation.
+- A dashboard with ticket counts, priority distribution, overdue counts, and active asset totals.
+- Ticket creation, search and filters, assignment, status transitions, optional resolution approval, and an event timeline.
+- An asset directory with organization-scoped create, update, activation, and search.
+- ADMIN user management and per-organization SLA settings.
+- Backend authorization and data queries scoped to the organization in the authenticated session.
 
-The application is a modular monolith. The API uses the base package `com.adria.atlasdesk`; future packages will be introduced only when their features are implemented. The frontend calls the API through Vite's `/api` proxy, which targets the `backend` Compose service.
+### Real application screenshots
+
+These images are captured from the running application by the Cypress browser using the isolated E2E database and its synthetic demo accounts. Run the E2E suite to refresh them.
+
+| Dashboard | Asset inventory |
+| --- | --- |
+| ![AtlasDesk dashboard](docs/screenshots/portfolio-screenshots.cy.ts/portfolio-dashboard.png) | ![AtlasDesk asset inventory](docs/screenshots/portfolio-screenshots.cy.ts/portfolio-assets.png) |
+
+| Ticket workflow | Ticket event history |
+| --- | --- |
+| ![AtlasDesk ticket workflow](docs/screenshots/portfolio-screenshots.cy.ts/portfolio-ticket-workflow.png) | ![AtlasDesk ticket history](docs/screenshots/portfolio-screenshots.cy.ts/portfolio-ticket-history.png) |
+
+| Organization settings | User administration |
+| --- | --- |
+| ![AtlasDesk organization settings](docs/screenshots/portfolio-screenshots.cy.ts/portfolio-settings.png) | ![AtlasDesk user administration](docs/screenshots/portfolio-screenshots.cy.ts/portfolio-users.png) |
+
+### Walkthrough
+
+1. Sign in with the isolated E2E ADMIN account and review the organization dashboard.
+2. Add an asset from **Ativos**. ADMIN and AGENT can maintain assets; REQUESTER can select active assets when opening a ticket.
+3. Sign in as REQUESTER, open a high-priority ticket, and optionally associate the asset. Its `dueAt` deadline is calculated using the organization SLA at creation time.
+4. Sign in as AGENT, assign the ticket to yourself, start the work, and request resolution. When approval is enabled, the ticket moves to `PENDING_APPROVAL`.
+5. Sign in as ADMIN, approve or reject the request, and inspect the ticket event timeline. A requester can close a resolved ticket.
+6. Review **Configurações** and **Usuários** as ADMIN. SLA changes apply to new tickets and do not rewrite existing deadlines.
+
+The screenshots and Cypress seed data are illustrative test data, not customer records.
+
+## Roles and access
+
+All organization-owned records are queried and changed using the organization ID from the authenticated session. A client-supplied ID does not grant cross-organization access. See [the permission matrix](docs/permissions.md).
+
+| Capability | ADMIN | AGENT | REQUESTER |
+| --- | --- | --- | --- |
+| Dashboard | All tickets in own organization | All tickets in own organization | Own tickets; active asset count for organization |
+| Tickets | Read/create; assign; administer transitions | Read/create; assign; transition when assigned | Read own; create; close own resolved tickets |
+| Ticket history | Same visibility as ticket | Same visibility as ticket | Own tickets only |
+| Assets | Read/create/update/activate | Read/create/update/activate | Read active assets with limited details |
+| Users | Manage users in own organization | No user directory access | Own profile only |
+| SLA settings | Read/update | Read | Read |
+
+## Architecture and stack
+
+AtlasDesk is a modular monolith with a REST API and a React single-page application. The backend is the authority for validation, authorization, tenant scoping, workflow transitions, and SLA calculation. The browser uses same-site HttpOnly session cookies and CSRF protection. PostgreSQL schema changes are versioned with Flyway; JPA validates the resulting schema.
+
+| Area | Technologies |
+| --- | --- |
+| API | Java 21, Spring Boot 3.5, Spring MVC, Spring Security, Spring Data JPA, Maven, JUnit 5 |
+| Web | React 18.3.1, TypeScript strict mode, Vite, React Router 6, Fetch API, native CSS |
+| Data | PostgreSQL 16, Flyway |
+| Browser tests | Cypress 15, Chrome, TypeScript |
+| Development and CI | Docker Compose, Jenkins Declarative Pipeline |
+
+### Repository layout
+
+```text
+backend/src/main/java/com/adria/atlasdesk/  API domains and security
+backend/src/main/resources/db/migration/   Flyway migrations V1–V6
+backend/src/test/java/                     JUnit and Spring integration tests
+frontend/src/                              React application and styles
+tests/e2e/cypress/e2e/                     Cypress browser workflows
+tests/e2e/cypress/fixtures/                 Synthetic E2E account data
+docs/                                      Permissions, decisions, screenshots
+compose.yml                                Development and E2E services
+Jenkinsfile                                Root Declarative Pipeline
+AGENTS.md                                  Repository engineering instructions
+```
 
 ## Prerequisites
 
+- Git
 - Docker Desktop or Docker Engine with Docker Compose v2
 
-Java, Maven, Node.js, npm, and PostgreSQL are provided or run inside containers; they do not need to be installed on the host.
+Java, Maven, Node.js, npm, PostgreSQL, Chrome, and Cypress run inside Docker containers. Do not install the application stack on the host.
 
-## Start development
+## Start from a fresh clone
 
-Copy the illustrative development settings, validate Compose, and start the application services from the project root:
+The repository is private. Clone it with an account that has access, then run these commands from the repository root:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose config
-docker compose up -d --build db backend frontend
+# Optional: edit .env and set DEV_ADMIN_PASSWORD to a local-only password.
+docker compose --profile e2e config --quiet
+docker compose up -d --build --wait db backend frontend
 docker compose ps
 ```
 
-Compose waits for PostgreSQL to become healthy before starting the backend, then waits for the API before starting the frontend. Open the frontend at <http://localhost:5173>; the API is available at <http://localhost:8080/api/health>. PostgreSQL is published on port `5432` by default.
+Open <http://localhost:5173>. The backend health endpoint is <http://localhost:8080/api/health>. The API container applies Flyway migrations before becoming healthy. PostgreSQL is available to host tools on port `5432` for local administration; application services communicate using Compose service names such as `db` and `backend`.
 
-The backend and frontend source directories are bind-mounted. Vite refreshes frontend changes automatically. Restart the backend after Java source changes so Maven recompiles them:
+If another local project uses one of these host ports, change `POSTGRES_PORT`, `BACKEND_HOST_PORT`, or `FRONTEND_HOST_PORT` in `.env`; the service ports and internal Docker addresses stay the same.
 
-```powershell
-docker compose restart backend
-```
+The checked-in `.env.example` contains synthetic local database settings and leaves `DEV_ADMIN_PASSWORD` empty. To create a local-only ADMIN account, set `DEV_ADMIN_PASSWORD` to a password you choose in the ignored `.env` file before starting the backend. The development seeder creates `atlasdesk-admin@localhost.test` only under the `dev` profile. Do not use local or E2E credentials in a deployed environment. Keep `SESSION_COOKIE_SECURE=true` when serving over HTTPS; the example uses `false` for the default local HTTP setup.
 
-The Compose backend explicitly activates the `dev` Spring profile by default, which idempotently seeds the `AtlasDesk Local` organization. It creates no user unless `DEV_ADMIN_PASSWORD` is supplied in the ignored `.env` file. When supplied, it creates the local ADMIN account `atlasdesk-admin@localhost.test` with that password. This account is dev-profile-only. Set `SPRING_PROFILES_ACTIVE` in `.env` to change the active profile; production runs should not activate `dev`.
+With the example database settings, you can look up the seeded organization ID with `docker compose exec db psql -U atlasdesk -d atlasdesk -c "select id, name from organizations;"`. Sign in with that ID, `atlasdesk-admin@localhost.test`, and the password you set in `.env`.
 
-## Authentication
+### Demo accounts
 
-The React app provides a protected session shell, login, overview, ticket list/create/detail pages, asset directory, and ADMIN-only user and organization settings pages. Every role can open and follow tickets; the API restricts REQUESTER accounts to their own tickets. The asset directory is available to all roles; ADMIN and AGENT can create, edit, inactivate, and reactivate assets, while REQUESTER sees only active assets and the number, name, and type needed to choose one for a ticket. It uses the Fetch API with the HttpOnly session cookie; mutating requests first obtain CSRF and send its token in the named header. Login JSON contains `organizationId`, `email`, and `password`. `GET /api/auth/me` restores a session after reload. Do not store passwords or session identifiers in browser storage. Compose defaults `SESSION_COOKIE_SECURE` to `true`; the example `.env` explicitly sets it to `false` for local HTTP. Keep it `true` for HTTPS deployments.
+The fixed demo identities are created only when the E2E profile resets its isolated database. They do not exist in the normal development or production database.
 
-The Cypress suite uses its own Compose services and persistent test-only PostgreSQL volume. It seeds fixed, non-production accounts and resets only that isolated database before every test. It does not use `.env`, the development database, or the optional development admin. Run the complete suite with:
-
-```powershell
-docker compose --profile e2e run --rm e2e
-```
-
-This command builds/starts the E2E-only backend, frontend, and database, then runs Cypress headlessly. Failure screenshots are written under `tests/e2e/cypress/screenshots`; Cypress video recording is disabled by default.
-
-User administration is available to ADMIN sessions at `GET /api/users?page=0&size=20`, `POST /api/users`, and `PATCH /api/users/{id}`. Create requests require `name`, `email`, `role`, and `password`; `active` defaults to `true`. PATCH accepts only supplied fields. Send the CSRF cookie and token header for POST/PATCH. User queries and changes always use the authenticated session's organization; password hashes are never returned, and the last active ADMIN cannot be deactivated or demoted.
-
-Assets are available at `GET /api/assets?page=0&size=20`, `POST /api/assets`, and `PATCH /api/assets/{id}`. Listing supports `search` (asset number or name), `type`, and `status` (`ACTIVE` or `INACTIVE`). ADMIN, AGENT, and REQUESTER sessions can list assets from their own organization; ADMIN and AGENT can create and update them. Create requests require `assetNumber`, `name`, and `type`; `description` is optional and `status` defaults to `ACTIVE`. PATCH accepts supplied fields, with an empty `description` clearing it. Asset numbers are unique without regard to case within each organization. The API derives organization scope from the session and does not accept organization IDs from clients.
-
-`GET /api/dashboard` returns ticket counts, priority distribution, overdue tickets, and ACTIVE asset count for the authenticated organization. ADMIN and AGENT counts cover all organization tickets; REQUESTER counts cover only tickets they requested, while ACTIVE asset count is organization-wide. `totalTickets` includes every ticket status and equals the sum of OPEN, IN_PROGRESS, PENDING_APPROVAL, RESOLVED, and CLOSED. A ticket is overdue only when `dueAt` is earlier than current UTC time and status is OPEN, IN_PROGRESS, or PENDING_APPROVAL; RESOLVED and CLOSED are excluded. Counts are computed by database aggregate queries; the endpoint does not load ticket rows into the application. The organization/status and organization/requester ticket indexes remain available for these scoped queries, and ACTIVE asset count filters on organization/status using the matching asset index.
-
-Tickets are available at `POST /api/tickets`, `GET /api/tickets?page=0&size=20`, `GET /api/tickets/{id}`, and `GET /api/tickets/{id}/history`. Create requests require a title, description, and `priority` (`LOW`, `MEDIUM`, or `HIGH`); `assetId` is optional. The requester is always the authenticated user, the initial status is `OPEN`, and organization scope comes from the session. REQUESTER sees only their own tickets; ADMIN and AGENT see tickets in their organization. Listing supports `search` by title, `status`, and `priority`, with page sizes from 1 to 100. Responses include requester, optional assignee and asset summaries, UTC timestamps, and a computed `overdue` flag. `dueAt` is a creation-time snapshot calculated from the organization's SLA in elapsed hours. New organizations start with LOW=72, MEDIUM=24, and HIGH=8; existing organizations keep their configured values through migration. `GET /api/settings` returns the active organization's SLA values to authenticated users. ADMIN can update all three values with `PATCH /api/settings` using `slaLowHours`, `slaMediumHours`, and `slaHighHours`, each an integer from 1 to 720. Updates apply only to newly created tickets: changing a ticket's priority later does not recalculate its deadline, and SLA changes never rewrite historical `dueAt` values. `overdue` is evaluated against current UTC time when a ticket is read, is false when there is no deadline or the ticket is RESOLVED/CLOSED, and remains applicable to OPEN, IN_PROGRESS, and PENDING_APPROVAL tickets. The UI formats the UTC deadline in the browser's local timezone and uses the API's `overdue` value without reimplementing the SLA rule; no background job is used. The history endpoint returns creation, assignment and workflow events in chronological order to users who can view that ticket. It uses UTC timestamps and the actor name captured when each event occurred. Existing tickets receive a creation event from their original requester and creation time; prior assignment and transition events are not reconstructed. ADMIN and AGENT assign active agents with `PATCH /api/tickets/{id}/assign` and an `assignedAgentId`. `POST /api/tickets/{id}/transition` accepts `START`, `RESOLVE`, `APPROVE`, `REJECT`, and `CLOSE`; invalid status transitions and concurrent updates return HTTP 409. The effective transition matrix is:
-
-| Action | From | To | Allowed actor |
+| Organization ID | Role | Email | Password |
 | --- | --- | --- | --- |
-| `START` | OPEN | IN_PROGRESS | Assigned AGENT or ADMIN |
-| `RESOLVE` | IN_PROGRESS | PENDING_APPROVAL when the organization requires approval; otherwise RESOLVED | Assigned AGENT; ADMIN may resolve directly |
-| `APPROVE` | PENDING_APPROVAL | RESOLVED | ADMIN in the same organization |
-| `REJECT` | PENDING_APPROVAL | IN_PROGRESS | ADMIN in the same organization |
-| `CLOSE` | RESOLVED | CLOSED | Ticket requester or ADMIN |
+| `1` | ADMIN | `admin@atlasdesk.test` | `AtlasE2E!2026` |
+| `1` | AGENT | `agent@atlasdesk.test` | `AtlasE2E!2026` |
+| `1` | REQUESTER | `requester@atlasdesk.test` | `AtlasE2E!2026` |
+| `2` | Other organization ADMIN | `admin@other-atlasdesk.test` | `AtlasE2E!2026` |
 
-An agent's resolution request does not set `resolvedAt` while pending. Approval records the resolution time; rejection leaves the ticket in progress so work can continue. Organization and requester visibility boundaries remain enforced.
+These accounts are deliberately synthetic, committed as test fixtures, and safe only for the disposable E2E database. Never copy them into a real environment.
 
-Named volumes preserve PostgreSQL data and Maven, npm, Cypress, frontend dependency, E2E dependency, and backend build caches across container restarts. The example database credentials are for local development only. Set matching `POSTGRES_*` and `DB_*` values in `.env` when changing them.
+### Local demonstration
 
-Build the application images or follow service logs when needed:
+The separate `demo` profile seeds two fictional organizations, an ADMIN, AGENT, and REQUESTER in each organization, six assets per organization, and twelve tickets per organization. Stable names, account emails, asset numbers, and ticket titles make the seed idempotent. The seeder creates the ticket states and history through the existing workflow rules. All accounts use a password from the ignored `.env.demo` file.
+
+Create the local settings file, set `DEMO_USER_PASSWORD` to a local-only password of 12–72 UTF-8 bytes, then start the isolated project:
 
 ```powershell
-docker compose build backend frontend
-docker compose logs -f db backend frontend
+Copy-Item .env.demo.example .env.demo
+# Edit .env.demo and set DEMO_USER_PASSWORD.
+docker compose -p atlasdesk-demo --env-file .env.demo config --quiet
+docker compose -p atlasdesk-demo --env-file .env.demo up -d --build --wait db backend frontend
 ```
 
-## Validate inside containers
+The demo logins use organization ID `1` for Atlas Technology and `2` for Nexus Solutions on a new volume. Passwords are not committed. The demo database has its own Compose project and volume; Cypress resets only its isolated E2E database. Stop the demo with `docker compose -p atlasdesk-demo --env-file .env.demo stop` to preserve its data.
 
-Start the stack first, then run the checks in the relevant service containers:
+### Development commands
+
+Source is bind-mounted for live editing. Vite refreshes frontend changes automatically; restart the backend after Java source changes.
 
 ```powershell
-docker compose exec backend mvn test
-docker compose exec backend mvn verify
+docker compose logs -f db backend frontend
+docker compose restart backend
+docker compose build backend frontend
+docker compose down
+```
+
+The named PostgreSQL and dependency-cache volumes persist across `docker compose down`. Do not use `docker compose down -v` for routine development.
+
+## Database migrations
+
+Flyway applies migrations on backend startup. Files are under `backend/src/main/resources/db/migration/`:
+
+| Migration | Schema change |
+| --- | --- |
+| V1 | Organizations and users |
+| V2 | Technology assets |
+| V3 | Support tickets |
+| V4 | Optimistic ticket version for concurrent updates |
+| V5 | Organization SLA ranges and defaults |
+| V6 | Ticket history events |
+
+Add new schema changes as the next versioned SQL migration; do not edit an already-applied migration. Existing ticket history includes creation events, but previous assignments and status transitions are not reconstructed.
+
+## Validation
+
+Run checks inside Compose containers. The development services must be started first for `exec` commands:
+
+```powershell
+docker compose exec backend mvn -B test
+docker compose exec backend mvn -B verify
 docker compose exec frontend npm run lint
 docker compose exec frontend npm run typecheck
 docker compose exec frontend npm run format:check
 docker compose exec frontend npm run build
 ```
 
-Run the complete Cypress suite on demand. Compose starts its isolated test database, backend, and frontend; the default development services and data are not used:
+The full E2E command uses a dedicated database and synthetic accounts; it does not connect to the development database. It also refreshes the portfolio screenshots in `docs/screenshots/`.
 
 ```powershell
 docker compose --profile e2e run --rm e2e
 ```
 
-The E2E project also has a container-only TypeScript check; see [`tests/e2e/README.md`](tests/e2e/README.md).
-
-## Jenkins CI
-
-Create a **Multibranch Pipeline** job in Jenkins with the GitHub Branch Source integration already available on that instance, connect it to `adriatravasso/atlasdesk` using the configured GitHub credentials, and keep the script path as `Jenkinsfile` at the repository root. Enable pull request discovery in the branch source so branches and PRs receive build status feedback. Assign the Docker-enabled Linux executor the label `docker-compose` used by the pipeline.
-
-The selected Linux agent must provide Docker CLI, Docker Compose v2, and access to a Docker Engine. It does not need Java, Maven, Node.js, npm, PostgreSQL, or Cypress installed: each validation runs inside the existing Compose images. The Jenkins agent manages Docker externally; application containers do not mount the Docker socket.
-
-Each build sets a unique `COMPOSE_PROJECT_NAME`, uses only the isolated `e2e` database and synthetic test accounts, and waits for the Compose health checks before Cypress runs. The pipeline archives Maven Surefire XML and Cypress screenshots/videos when present. Cleanup removes that build's containers and network without removing named volumes; build-specific test volumes are isolated from development and can be removed by the Jenkins infrastructure owner under that runner's retention policy.
-
-Flyway applies versioned schema migrations during backend startup. The initial migration creates organization and user tables; JPA validates the schema rather than updating it.
-
-## Stop development
+To run only the screenshot walkthrough while iterating on documentation:
 
 ```powershell
-docker compose down
+docker compose --profile e2e run --rm --entrypoint sh e2e -c "npm ci --prefer-offline && npx cypress run --browser chrome --spec cypress/e2e/portfolio-screenshots.cy.ts"
 ```
 
-This stops and removes the containers while preserving named volumes and local database data. Do not use volume-removal options for routine shutdown.
+See [the E2E guide](tests/e2e/README.md) for Cypress configuration, isolation, typechecking, screenshots, and the Jenkins pipeline.
 
-## Implemented
+## Continuous integration
 
-- Spring Boot API with `GET /api/health`, returning `{"status":"UP","service":"atlasdesk-api"}`.
-- PostgreSQL datasource configuration and Flyway integration.
-- A web MVC test for the health endpoint.
-- Organization-scoped asset API with paginated filters, ADMIN/AGENT writes, and PostgreSQL uniqueness for asset numbers.
-- Organization-scoped ticket creation, paginated/filterable listing, ticket details, requester ownership, optional same-organization asset association, and SLA deadline snapshots.
-- Organization-scoped SLA settings with ADMIN-only updates, stable ticket deadlines, and dynamically calculated overdue status.
-- Role-checked ticket assignment, optional ADMIN approval/rejection of agent resolutions, and ticket transition timestamps with optimistic locking.
-- React authenticated shell, session restoration, login/logout, role-protected user directory, role-aware asset inventory UI, ticket create/list/detail pages, and Vite API proxy.
-- PostgreSQL 16, backend, and frontend Compose services with health checks, service dependencies, bind mounts, and persistent caches.
-- Production image stages for the backend and frontend Dockerfiles.
-- Cypress E2E smoke test and isolated dependency lockfile under `tests/e2e`, run in an opt-in Compose profile.
+The root `Jenkinsfile` is a Declarative Multibranch Pipeline. Configure a Docker-enabled Linux agent with Docker CLI, Compose v2, and a Docker Engine; the agent does not need Java, Maven, Node.js, npm, PostgreSQL, Chrome, or Cypress installed. Configure the agent label `docker-compose` and enable branch and pull-request discovery for the private `adriatravasso/atlasdesk` repository.
 
-## Planned
+Each build uses a unique Compose project and the isolated E2E database. It validates Compose, compiles and tests the backend, lints/typechecks/builds the frontend, runs Cypress, archives test reports and screenshots, then removes the build containers and network while preserving named volumes. Application containers do not mount the Docker socket.
 
-Optional resolution approval and operational dashboards are available. Jenkins CI runs through the root declarative pipeline on a Docker-enabled agent.
+## Decisions and current limitations
+
+The key implementation decisions and known product limitations are documented in [docs/decisions-and-limitations.md](docs/decisions-and-limitations.md). AtlasDesk does not currently provide email notifications, file attachments, ticket comments, password recovery, SSO, production deployment infrastructure, or historical reconstruction of pre-V6 ticket transitions.
+
+The repository remains private. No release tag or public release is created by this task; a `v1.0.0` tag requires human review and explicit release approval after the ATL-0025 validation and PR review are complete.
