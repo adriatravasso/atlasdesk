@@ -38,6 +38,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     Optional<Ticket> findByIdAndOrganizationId(Long id, Long organizationId);
 
+    Optional<Ticket> findByOrganizationIdAndTitle(Long organizationId, String title);
+
     @Query(value = """
             select new com.adria.atlasdesk.ticket.TicketSummary(
                 ticket.id, ticket.organization.id, ticket.title, ticket.description,

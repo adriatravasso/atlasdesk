@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.demo.example
 
 # Java / Maven
 backend/target/
@@ -21,6 +22,7 @@ frontend/coverage/
 tests/e2e/node_modules/
 tests/e2e/cypress/screenshots/
 tests/e2e/cypress/videos/
+tests/e2e/artifacts/
 
 # IDE and operating system
 .idea/

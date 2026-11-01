@@ -41,17 +41,60 @@ docker compose restart backend
 
 The Compose backend explicitly activates the `dev` Spring profile by default, which idempotently seeds the `AtlasDesk Local` organization. It creates no user unless `DEV_ADMIN_PASSWORD` is supplied in the ignored `.env` file. When supplied, it creates the local ADMIN account `atlasdesk-admin@localhost.test` with that password. This account is dev-profile-only. Set `SPRING_PROFILES_ACTIVE` in `.env` to change the active profile; production runs should not activate `dev`.
 
+## Local demonstration
+
+The separate `demo` profile seeds two fictional organizations, an ADMIN, AGENT, and REQUESTER in each organization, six assets per organization, and twelve tickets per organization. The seed uses stable organization names, account emails, asset numbers, and ticket titles so backend restarts do not duplicate records. Ticket states and history are created using the application's existing transition rules. All accounts use a password configured in the ignored `.env.demo` file.
+
+Create the local settings file, set `DEMO_USER_PASSWORD` to a local-only password of 12–72 UTF-8 bytes, then start the isolated `atlasdesk-demo` Compose project:
+
+```powershell
+Copy-Item .env.demo.example .env.demo
+# Edit .env.demo and set DEMO_USER_PASSWORD.
+docker compose -p atlasdesk-demo --env-file .env.demo config --quiet
+docker compose -p atlasdesk-demo --env-file .env.demo up -d --build --wait db backend frontend
+docker compose -p atlasdesk-demo --env-file .env.demo ps
+```
+
+Open <http://localhost:5173>; the API health check is at <http://localhost:8080/api/health>. Demo login uses the generated organization ID (1 for Atlas Technology and 2 for Nexus Solutions on a new volume), the account email, and the password from `.env.demo`:
+
+| Organization | Role | Email |
+| --- | --- | --- |
+| Atlas Technology | ADMIN | `admin@atlasdemo.local` |
+| Atlas Technology | AGENT | `agent@atlasdemo.local` |
+| Atlas Technology | REQUESTER | `requester@atlasdemo.local` |
+| Nexus Solutions | ADMIN | `admin@nexusdemo.local` |
+| Nexus Solutions | AGENT | `agent@nexusdemo.local` |
+| Nexus Solutions | REQUESTER | `requester@nexusdemo.local` |
+
+To confirm or inspect the synthetic records, check backend startup logs and query the database container:
+
+```powershell
+docker compose -p atlasdesk-demo --env-file .env.demo logs backend
+docker compose -p atlasdesk-demo --env-file .env.demo exec db psql -U atlasdesk_demo -d atlasdesk_demo -c "select id, name, require_approval, sla_low_hours, sla_medium_hours, sla_high_hours from organizations order by id;"
+docker compose -p atlasdesk-demo --env-file .env.demo exec db psql -U atlasdesk_demo -d atlasdesk_demo -c "select organization_id, status, count(*) from tickets group by organization_id, status order by organization_id, status;"
+```
+
+The demo profile is for local exploration only. The E2E project uses a separate PostgreSQL volume and its reset endpoint is available only to the E2E backend, so running Cypress does not reset or alter demonstration data. No demo password is committed. Stop the demo containers while retaining its named volumes with `docker compose -p atlasdesk-demo --env-file .env.demo stop`.
+
 ## Authentication
 
 The React app provides a protected session shell, login, overview, ticket list/create/detail pages, asset directory, and ADMIN-only user and organization settings pages. Every role can open and follow tickets; the API restricts REQUESTER accounts to their own tickets. The asset directory is available to all roles; ADMIN and AGENT can create, edit, inactivate, and reactivate assets, while REQUESTER sees only active assets and the number, name, and type needed to choose one for a ticket. It uses the Fetch API with the HttpOnly session cookie; mutating requests first obtain CSRF and send its token in the named header. Login JSON contains `organizationId`, `email`, and `password`. `GET /api/auth/me` restores a session after reload. Do not store passwords or session identifiers in browser storage. Compose defaults `SESSION_COOKIE_SECURE` to `true`; the example `.env` explicitly sets it to `false` for local HTTP. Keep it `true` for HTTPS deployments.
 
-The Cypress suite uses its own Compose services and persistent test-only PostgreSQL volume. It seeds fixed, non-production accounts and resets only that isolated database before every test. It does not use `.env`, the development database, or the optional development admin. Run the complete suite with:
+The Cypress suite uses the isolated `atlasdesk-e2e` Compose project and its own persistent test-only PostgreSQL volume. It seeds fixed, non-production accounts and resets only that database before each test. It does not use `.env.demo`, the demonstration database, or the development admin. Headless runs write JUnit reports, videos, and failure screenshots under `tests/e2e/artifacts/`.
+
+Run the complete suite headlessly with:
 
 ```powershell
-docker compose --profile e2e run --rm e2e
+docker compose -p atlasdesk-e2e --profile e2e run --rm e2e
 ```
 
-This command builds/starts the E2E-only backend, frontend, and database, then runs Cypress headlessly. Failure screenshots are written under `tests/e2e/cypress/screenshots`; Cypress video recording is disabled by default.
+The optional visual run starts a headed Chrome browser under Xvfb and exposes the VNC display only on the local computer:
+
+```powershell
+docker compose -p atlasdesk-e2e --profile e2e run --rm --service-ports e2e visual
+```
+
+While the suite runs, open <http://localhost:6080/vnc.html>. To run Cypress Open and choose a spec interactively, use `docker compose -p atlasdesk-e2e --profile e2e run --rm --service-ports e2e interactive`. The E2E frontend is also available at <http://localhost:5174> for manual inspection while its services are running. For one headed scenario, append `--spec cypress/e2e/authentication.cy.ts` after `visual`.
 
 User administration is available to ADMIN sessions at `GET /api/users?page=0&size=20`, `POST /api/users`, and `PATCH /api/users/{id}`. Create requests require `name`, `email`, `role`, and `password`; `active` defaults to `true`. PATCH accepts only supplied fields. Send the CSRF cookie and token header for POST/PATCH. User queries and changes always use the authenticated session's organization; password hashes are never returned, and the last active ADMIN cannot be deactivated or demoted.
 
@@ -96,10 +139,10 @@ docker compose exec frontend npm run build
 Run the complete Cypress suite on demand. Compose starts its isolated test database, backend, and frontend; the default development services and data are not used:
 
 ```powershell
-docker compose --profile e2e run --rm e2e
+docker compose -p atlasdesk-e2e --profile e2e run --rm e2e
 ```
 
-The E2E project also has a container-only TypeScript check; see [`tests/e2e/README.md`](tests/e2e/README.md).
+The isolated project name used above is important when the demo and tests run together. The E2E project also has a container-only TypeScript check; see [`tests/e2e/README.md`](tests/e2e/README.md) for the headed noVNC mode and evidence paths.
 
 ## Jenkins CI
 
@@ -107,7 +150,7 @@ Create a **Multibranch Pipeline** job in Jenkins with the GitHub Branch Source i
 
 The selected Linux agent must provide Docker CLI, Docker Compose v2, and access to a Docker Engine. It does not need Java, Maven, Node.js, npm, PostgreSQL, or Cypress installed: each validation runs inside the existing Compose images. The Jenkins agent manages Docker externally; application containers do not mount the Docker socket.
 
-Each build sets a unique `COMPOSE_PROJECT_NAME`, uses only the isolated `e2e` database and synthetic test accounts, and waits for the Compose health checks before Cypress runs. The pipeline archives Maven Surefire XML and Cypress screenshots/videos when present. Cleanup removes that build's containers and network without removing named volumes; build-specific test volumes are isolated from development and can be removed by the Jenkins infrastructure owner under that runner's retention policy.
+Each build sets a unique `COMPOSE_PROJECT_NAME`, uses only the isolated `e2e` database and synthetic test accounts, and waits for the Compose health checks before Cypress runs. The pipeline archives Maven Surefire XML, Cypress JUnit reports, screenshots, and videos when present. Cleanup removes that build's containers and network without removing named volumes; build-specific test volumes are isolated from development and can be removed by the Jenkins infrastructure owner under that runner's retention policy.
 
 Flyway applies versioned schema migrations during backend startup. The initial migration creates organization and user tables; JPA validates the schema rather than updating it.
 

@@ -68,7 +68,7 @@ pipeline {
 
         stage('Collect reports') {
             steps {
-                archiveArtifacts artifacts: 'backend/.ci-reports/surefire-reports/**/*.xml,tests/e2e/cypress/screenshots/**/*,tests/e2e/cypress/videos/**/*', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'backend/.ci-reports/surefire-reports/**/*.xml,tests/e2e/artifacts/**/*', allowEmptyArchive: true
             }
         }
 
@@ -81,7 +81,7 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'backend/.ci-reports/surefire-reports/**/*.xml,tests/e2e/cypress/screenshots/**/*,tests/e2e/cypress/videos/**/*', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'backend/.ci-reports/surefire-reports/**/*.xml,tests/e2e/artifacts/**/*', allowEmptyArchive: true
             sh 'docker compose --profile e2e down --remove-orphans'
         }
     }
