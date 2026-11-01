@@ -32,7 +32,7 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       APP_DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
     ports:
-      - "8080:8080"
+      - "${BACKEND_HOST_PORT:-8080}:8080"
     volumes:
       - ./backend:/workspace/backend
       - maven_cache:/root/.m2
@@ -58,7 +58,7 @@ services:
     environment:
       VITE_API_TARGET: http://backend:8080
     ports:
-      - "5173:5173"
+      - "${FRONTEND_HOST_PORT:-5173}:5173"
     volumes:
       - ./frontend:/workspace/frontend
       - frontend_node_modules:/workspace/frontend/node_modules
@@ -87,6 +87,7 @@ services:
       CYPRESS_BASE_URL: http://e2e-frontend:5173
     volumes:
       - ./tests/e2e:/e2e
+      - ./docs/screenshots:/screenshots
       - e2e_node_modules:/e2e/node_modules
       - e2e_npm_cache:/root/.npm
       - cypress_cache:/root/.cache/Cypress

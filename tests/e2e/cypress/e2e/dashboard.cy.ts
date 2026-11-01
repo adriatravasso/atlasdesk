@@ -81,6 +81,7 @@ describe("Operational dashboard", () => {
         role: "ADMIN",
       },
     });
+    cy.intercept("GET", "/api/health", { statusCode: 503 });
     cy.intercept("GET", "/api/dashboard", {
       statusCode: 503,
       body: { detail: "Dashboard unavailable" },
@@ -106,7 +107,7 @@ describe("Operational dashboard", () => {
         activeAssets: 0,
       },
     }).as("dashboardRetry");
-    cy.contains("button", "Tentar novamente").click();
+    cy.get('[role="alert"]').contains("button", "Tentar novamente").click();
     cy.wait("@dashboardRetry");
     cy.contains("Ainda não há chamados para exibir nesta visão.").should(
       "be.visible",
