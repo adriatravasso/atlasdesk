@@ -32,6 +32,8 @@ app:
   demo:
     admin-password: ${DEMO_ADMIN_PASSWORD:}
     admin-email: ${DEMO_ADMIN_EMAIL:atlasdesk-demo@example.invalid}
+    requester-password: ${DEMO_REQUESTER_PASSWORD:}
+    requester-email: ${DEMO_REQUESTER_EMAIL:demo.requester@atlasdesk.test}
     organization-name: ${DEMO_ORGANIZATION_NAME:AtlasDesk Public Demo}
 
 logging:

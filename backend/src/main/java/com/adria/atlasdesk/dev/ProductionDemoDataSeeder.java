@@ -36,4 +36,25 @@ public class ProductionDemoDataSeeder {
             }
         };
     }
+
+    @Bean
+    CommandLineRunner seedDemoRequester(OrganizationRepository organizations, UserRepository users,
+            PasswordEncoder passwordEncoder,
+            @Value("${app.demo.requester-password:}") String requesterPassword,
+            @Value("${app.demo.requester-email:demo.requester@atlasdesk.test}") String requesterEmail,
+            @Value("${app.demo.organization-name:AtlasDesk Public Demo}") String organizationName) {
+        return args -> {
+            if (requesterPassword.isBlank()) {
+                return;
+            }
+            if (!organizations.existsByName(organizationName)) {
+                organizations.save(new Organization(organizationName, true, 72, 24, 8));
+            }
+            Organization organization = organizations.findByName(organizationName).orElseThrow();
+            if (!users.existsByOrganizationIdAndEmailIgnoreCase(organization.getId(), requesterEmail)) {
+                users.save(new User(organization, "AtlasDesk Demo Requester", requesterEmail,
+                        passwordEncoder.encode(requesterPassword), UserRole.REQUESTER));
+            }
+        };
+    }
 }

@@ -49,7 +49,7 @@ Open <http://localhost:5173>. The API health endpoint is <http://localhost:8080/
 
 ## Hosted demonstration
 
-The public frontend is served by [Cloudflare Pages](https://atlasdesk.pages.dev), with API requests proxied to the [Render backend](https://atlasdesk-api.onrender.com/api/health). The database is hosted on Neon. This is a free-tier demonstration and has no public demo credentials. See [deployment details and limits](docs/deployment.md).
+The public frontend is served by [Cloudflare Pages](https://atlasdesk.pages.dev), with API requests proxied to the [Render backend](https://atlasdesk-api.onrender.com/api/health). The database is hosted on Neon. This is a free-tier demonstration; sign in with the restricted demo requester account described out of band. See [deployment details and limits](docs/deployment.md).
 
 ## Documentation
 

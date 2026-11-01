@@ -16,13 +16,13 @@ Cloudflare Pages builds the frontend from `main` and serves static files at `htt
 
 The Cloudflare Pages project is connected to the private GitHub repository and production branch `main`. Its production settings include `NODE_VERSION=22.13.0` and the Pages Function variable `ATLASDESK_API_ORIGIN=https://atlasdesk-api.onrender.com`.
 
-Render receives `SPRING_PROFILES_ACTIVE=prod`, the Neon JDBC URL and credentials as service environment variables, `DB_POOL_MAX=3`, and `SESSION_COOKIE_SECURE=true`. Render supplies the listening `PORT`. Keep database credentials only in Render's secret environment. Do not configure `DEMO_ADMIN_PASSWORD` for public access or publish any administrator credentials.
+Render receives `SPRING_PROFILES_ACTIVE=prod`, the Neon JDBC URL and credentials as service environment variables, `DB_POOL_MAX=3`, and `SESSION_COOKIE_SECURE=true`. Render supplies the listening `PORT`. Keep database credentials only in Render's secret environment. Do not configure `DEMO_ADMIN_PASSWORD` for public access or publish any administrator credentials. A restricted demo requester is provisioned using the secret `DEMO_REQUESTER_PASSWORD`; its default email is `demo.requester@atlasdesk.test`.
 
 Neon currently runs PostgreSQL 18.6 in `aws-us-east-2`. The `production` branch was empty of AtlasDesk application tables before the first deployment. The dedicated application role has database connect and `public` schema usage/create privileges required by Flyway and the application. Flyway applies schema changes at backend startup; Hibernate validates the resulting schema.
 
 ## Authentication and data
 
-No public demo account is configured. Visitors can reach the frontend, but a valid application user is required to sign in. Do not use E2E credentials or local seeded accounts in the hosted database. Do not add a public ADMIN password. If a restricted demo identity is introduced later, it must be isolated to synthetic data and unable to administer the platform or access another organization.
+The hosted demo provisions a synthetic `REQUESTER` account in the `AtlasDesk Public Demo` organization when `DEMO_REQUESTER_PASSWORD` is set in Render. It can create and view requester tickets within that organization, but cannot administer the platform or access another organization. Share the password out of band; never commit it or publish it in documentation. Do not use E2E credentials or local seeded accounts in the hosted database, and do not add a public ADMIN password.
 
 The API keeps session and CSRF protection enabled. Session cookies use HTTPS settings, and organization scope comes from the authenticated backend session. Render's filesystem is ephemeral and in-memory sessions are lost when the free service restarts or wakes from idle.
 

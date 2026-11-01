@@ -18,8 +18,8 @@ This note records decisions that affect the existing behavior. It is not a roadm
 - SLA durations are elapsed hours, not business hours, and there is no background job or escalation notification.
 - Migration V6 records new history events and adds a creation event for existing tickets. It does not reconstruct earlier assignment or status-change history.
 - The hosted demonstration uses Cloudflare Pages, Render Free, and Neon Free; it has no business backup, external monitoring, or operational incident process. See [deployment details](deployment.md).
-- Demo accounts and passwords belong exclusively to the E2E profile and its isolated database. They must never be reused outside it.
-- The hosted frontend has no public demo identity. A valid user is required to sign in; no ADMIN credentials are published.
+- E2E demo accounts belong exclusively to the E2E profile and its isolated database. The hosted demo uses a separate synthetic `REQUESTER` account with no administrative permissions; its password is configured as a Render secret and shared out of band.
+- No public ADMIN credentials are published. The hosted demo identity is scoped to its own organization.
 
 ## Release gate
 
