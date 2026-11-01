@@ -31,6 +31,7 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       APP_DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
     ports:
       - "${BACKEND_HOST_PORT:-8080}:8080"
     volumes:
@@ -76,11 +77,12 @@ services:
       start_period: 20s
 
   e2e:
-    image: cypress/browsers:22.15.0
+    build:
+      context: .
+      dockerfile: tests/e2e/Dockerfile
     profiles: ["e2e"]
     working_dir: /e2e
-    entrypoint: ["sh", "-c"]
-    command: ["npm ci --prefer-offline && npx cypress run --browser chrome"]
+    command: ["headless"]
     environment:
       CYPRESS_CACHE_FOLDER: /root/.cache/Cypress
       TZ: America/Manaus
@@ -96,6 +98,8 @@ services:
         condition: service_healthy
     networks:
       - atlasdesk
+    ports:
+      - "127.0.0.1:${E2E_VISUAL_HOST_PORT:-6080}:6080"
 
   e2e-db:
     image: postgres:16-alpine
@@ -154,6 +158,8 @@ services:
       - ./frontend:/workspace/frontend
       - frontend_node_modules:/workspace/frontend/node_modules
       - npm_cache:/root/.npm
+    ports:
+      - "127.0.0.1:${E2E_FRONTEND_HOST_PORT:-5174}:5173"
     depends_on:
       e2e-backend:
         condition: service_healthy

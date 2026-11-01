@@ -6,8 +6,14 @@ export default defineConfig({
     specPattern: "cypress/e2e/**/*.cy.ts",
     supportFile: "cypress/support/e2e.ts",
     screenshotsFolder: "/screenshots",
-    video: false,
+    videosFolder: "artifacts/videos",
+    video: true,
     screenshotOnRunFailure: true,
+  },
+  reporter: "mocha-junit-reporter",
+  reporterOptions: {
+    mochaFile: "artifacts/reports/results-[hash].xml",
+    toConsole: true,
   },
   allowCypressEnv: false,
 });

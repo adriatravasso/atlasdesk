@@ -10,7 +10,21 @@ Compose starts a dedicated PostgreSQL service, backend, and frontend for Cypress
 
 The suite covers invalid and valid login, session restore/logout, protected API access, user and asset administration, organization authorization boundaries, ticket creation, priority SLA snapshots, assignment, workflow, resolution approval, history, dashboard metrics, and organization separation. Browser flows exercise the real frontend and backend; a small set of UI-only error/loading cases use API interception. `portfolio-screenshots.cy.ts` is an end-to-end walkthrough against the same real services; it resets only the E2E database and captures real browser screenshots into the repository's `docs/screenshots/` directory.
 
-Source, fixtures, configuration, and the npm lockfile live under `tests/e2e`. The E2E directory is bind-mounted. Cypress screenshots are written through a dedicated bind mount to `docs/screenshots/`; video recording is disabled. Node.js, npm, Chrome, and Cypress run inside the test container, with npm and Cypress caches in named volumes.
+Source, fixtures, configuration, and the npm lockfile live under `tests/e2e`. The E2E directory is bind-mounted. Cypress screenshots are written through a dedicated bind mount to `docs/screenshots/`; videos and JUnit reports are saved under `tests/e2e/artifacts/`. Node.js, npm, Chrome, and Cypress run inside the test container, with npm and Cypress caches in named volumes.
+
+For headed browser validation, the Cypress image includes Xvfb, x11vnc, and noVNC. Compose exposes the viewer only on the local machine:
+
+```powershell
+docker compose --profile e2e run --rm --service-ports e2e visual
+```
+
+Open <http://localhost:6080/vnc.html> while Cypress runs. To open Cypress interactively and select a spec:
+
+```powershell
+docker compose --profile e2e run --rm --service-ports e2e interactive
+```
+
+The suite writes JUnit reports and videos to `tests/e2e/artifacts/`. The portfolio walkthrough writes its committed screenshots to `docs/screenshots/`.
 
 To regenerate only the portfolio images from the repository root:
 

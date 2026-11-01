@@ -13,6 +13,8 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
 
     Optional<Asset> findByIdAndOrganizationId(Long id, Long organizationId);
 
+    Optional<Asset> findByOrganizationIdAndAssetNumberIgnoreCase(Long organizationId, String assetNumber);
+
     boolean existsByOrganizationIdAndAssetNumberIgnoreCase(Long organizationId, String assetNumber);
 
     boolean existsByOrganizationIdAndAssetNumberIgnoreCaseAndIdNot(

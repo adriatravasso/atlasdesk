@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "cypress": "15.21.1",
+    "mocha-junit-reporter": "^2.2.1",
     "typescript": "~5.9.3"
   }
 }

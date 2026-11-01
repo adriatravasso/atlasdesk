@@ -120,6 +120,21 @@ The fixed demo identities are created only when the E2E profile resets its isola
 
 These accounts are deliberately synthetic, committed as test fixtures, and safe only for the disposable E2E database. Never copy them into a real environment.
 
+### Local demonstration
+
+The separate `demo` profile seeds two fictional organizations, an ADMIN, AGENT, and REQUESTER in each organization, six assets per organization, and twelve tickets per organization. Stable names, account emails, asset numbers, and ticket titles make the seed idempotent. The seeder creates the ticket states and history through the existing workflow rules. All accounts use a password from the ignored `.env.demo` file.
+
+Create the local settings file, set `DEMO_USER_PASSWORD` to a local-only password of 12–72 UTF-8 bytes, then start the isolated project:
+
+```powershell
+Copy-Item .env.demo.example .env.demo
+# Edit .env.demo and set DEMO_USER_PASSWORD.
+docker compose -p atlasdesk-demo --env-file .env.demo config --quiet
+docker compose -p atlasdesk-demo --env-file .env.demo up -d --build --wait db backend frontend
+```
+
+The demo logins use organization ID `1` for Atlas Technology and `2` for Nexus Solutions on a new volume. Passwords are not committed. The demo database has its own Compose project and volume; Cypress resets only its isolated E2E database. Stop the demo with `docker compose -p atlasdesk-demo --env-file .env.demo stop` to preserve its data.
+
 ### Development commands
 
 Source is bind-mounted for live editing. Vite refreshes frontend changes automatically; restart the backend after Java source changes.
