@@ -1,65 +1,61 @@
 # Free demonstration deployment
 
-This guide prepares the existing private repository for a non-production demonstration. It does not publish the application. Keep real user data, credentials, and production workloads out of the free environment.
+AtlasDesk is prepared for a public, non-commercial demonstration using the existing private repository. Deployments must come from `main` after the ATL-0028 change is reviewed and integrated. Keep real user data, credentials, and production workloads out of the free environment.
 
-## 1. Create the Neon database
+## Existing resource inventory
 
-1. Create a Neon project using PostgreSQL 16 and select a region near the Render service.
-2. Create an application role and an `atlasdesk` database.
-3. Copy the **pooled** connection endpoint and credentials from Neon. Configure the JDBC URL using TLS, for example `jdbc:postgresql://<pooled-endpoint>/<database>?sslmode=require`.
-4. Keep the database URL, username, and password in Render environment settings. Do not place them in the frontend or source control.
+- Neon project `atlasdesk` belongs to Adria's account, runs PostgreSQL 18 in `aws-us-east-2`, and is on the Free plan. Its `production` branch is ready, with database `atlasdeskdb`; the initial inspection found no application tables and only the project owner role. The endpoint was idle at inspection time. Recheck its plan, usage, and data before applying migrations.
+- Render workspace `My Workspace` belongs to `adria.travasso.dev@gmail.com`; no AtlasDesk service existed at inventory time. Create only `atlasdesk-api` as a Free Docker Web Service.
+- Adria's Cloudflare account had no Pages project named `atlasdesk` at inventory time. Recheck before creating it; configure production from `main`.
 
-The production profile runs Flyway before serving requests, uses `ddl-auto=validate`, and caps the Hikari pool at three connections by default. The database must be reachable from Render. No local files are used for persistence.
+## PostgreSQL compatibility and database setup
 
-## 2. Deploy the backend on Render
+Neon currently runs PostgreSQL 18, while local development uses PostgreSQL 16. Before touching the Neon production branch, run the backend tests and all Flyway migrations against isolated PostgreSQL 18 in Docker Compose. Do not use the Neon production database as a migration test environment.
 
-1. In Render, create a **Free Web Service** linked to the private `adriatravasso/atlasdesk` repository and deploy branch `main` after the ATL-0025 changes are reviewed and integrated.
-2. Use repository root as the build context and `backend/Dockerfile` as the Dockerfile path. Select the Free compute plan and set `/api/health` as the health-check path.
-3. Set these environment variables. Add the password values using Render's secret input; never commit them.
+Use the existing `atlasdesk` Neon project and `production` branch; do not create a duplicate project, reset the branch, or copy development data. Create a dedicated application role with only database connect and schema/table privileges required by Flyway and the app. Use the direct Neon endpoint with a TLS JDBC URL such as `jdbc:postgresql://<endpoint>/atlasdeskdb?sslmode=require`; the inspected branch had connection pooling disabled. Store the username and password only in Render's secret environment. Check Neon Free limits in its dashboard before publishing.
 
-   | Variable | Value |
-   | --- | --- |
-   | `SPRING_PROFILES_ACTIVE` | `prod` |
-   | `DB_URL` | `jdbc:postgresql://<pooled-endpoint>/<database>?sslmode=require` |
-   | `DB_USERNAME` | Neon application role |
-   | `DB_PASSWORD` | Neon application role password (secret) |
-   | `DB_POOL_MAX` | `3` |
-   | `SESSION_COOKIE_SECURE` | `true` |
-   | `DEMO_ADMIN_PASSWORD` | A unique, strong synthetic demo password (secret) |
-   | `DEMO_ADMIN_EMAIL` | Optional; defaults to `atlasdesk-demo@example.invalid` |
-   | `DEMO_ORGANIZATION_NAME` | Optional; defaults to `AtlasDesk Public Demo` |
+The production profile uses Flyway at startup, `ddl-auto=validate`, a three-connection Hikari pool by default, and Render's `PORT`. It keeps session and CSRF cookies HttpOnly, Secure, and SameSite=Lax. Render's free web service has 512 MB RAM and 0.1 CPU, can sleep after 15 minutes without inbound traffic, and typically needs about one minute to wake; the frontend status banner accounts for that delay. The JVM's container-aware memory ceiling stays below the full 512 MB limit.
 
-Render supplies `PORT`; the application binds to it. The production data seeder creates only the synthetic demo organization and ADMIN when the password secret is set, and does not overwrite an existing user. No public registration route is enabled. Keep the admin password private; share access only with intended reviewers. Remove or rotate the secret if the demo is no longer needed.
+## Backend on Render
 
-After the first successful start, check Render logs for Flyway completing and `/api/health` passing. The `DB_URL` format and password are stored only in the backend configuration, not in Vite variables or the Pages bundle.
+Create `atlasdesk-api` in the confirmed `My Workspace` as a Free Web Service connected to `adriatravasso/atlasdesk`, production branch `main`, runtime Docker. Use repository root as the build context, `backend/Dockerfile` as the Dockerfile path, and `/api/health` as the health-check path. Do not use the full Compose stack in production.
 
-## 3. Publish the frontend on Cloudflare Pages
+Set only the environment variables needed by the production profile:
 
-1. Create a Pages project connected to the private repository and set production branch to `main`.
-2. Set **Root directory** to `frontend`, **Build command** to `npm run build`, and **Build output directory** to `dist`.
-3. Add a runtime Pages Function variable named `ATLASDESK_API_ORIGIN` with the Render HTTPS origin, such as `https://<service>.onrender.com`. Do not prefix this with `VITE_`; it is read by the server-side Function, not embedded in JavaScript.
-4. Deploy and use the generated `https://<project>.pages.dev` address.
+| Variable | Value |
+| --- | --- |
+| `SPRING_PROFILES_ACTIVE` | `prod` |
+| `DB_URL` | Neon JDBC URL with `sslmode=require` |
+| `DB_USERNAME` | Dedicated Neon application role |
+| `DB_PASSWORD` | Secret for that role |
+| `DB_POOL_MAX` | `3` |
+| `SESSION_COOKIE_SECURE` | `true` |
+| `DEMO_ADMIN_PASSWORD` | Omit unless a private reviewer account is explicitly needed; never publish this secret |
 
-The checked-in `frontend/functions/api/[[path]].js` only handles `/api/*`, derives its target solely from the configured HTTPS origin, preserves request and response details required by the existing session and CSRF flow, and returns a gateway error when the backend is unavailable. `frontend/public/_routes.json` keeps static assets out of Function invocation routes. Local development continues to use the existing Vite proxy to the Compose `backend` service.
+Render supplies `PORT`. Confirm the service is on the Free plan, not a paid compute plan, before creating it. Inspect the build, startup logs, Flyway result, health endpoint, and database connection after deployment.
 
-## 4. Validate the published setup
+## Frontend on Cloudflare Pages
 
-From the Pages URL:
+Create or reuse Pages project `atlasdesk` in Adria's confirmed Cloudflare account, connected to the private repository `adriatravasso/atlasdesk` and production branch `main`. Configure:
 
-1. Confirm `/api/health` returns `UP` after the Render service starts.
-2. Sign in with the generated organization ID, configured `DEMO_ADMIN_EMAIL`, and the password configured privately in Render.
-3. Create and edit a synthetic user, open a ticket, and confirm the session cookie remains `HttpOnly`, `Secure`, and `SameSite=Lax` in browser developer tools.
-4. Confirm mutating requests carry the existing CSRF header and that a user without ADMIN permission receives the existing denial.
-5. Test logout, then allow Render to idle and confirm the Pages frontend stays available while the status notice reports startup and then readiness.
+- Root directory: `frontend`
+- Build command: `npm ci && npm run build`
+- Build output directory: `dist`
+- `NODE_VERSION`: `22.13.0`
+- Runtime Pages Function variable `ATLASDESK_API_ORIGIN`: HTTPS origin of the Render service, with no path or credentials
 
-Do not advertise deployment as complete until these checks pass against actual provider deployments. Jenkins and Cypress still run through the existing Docker Compose pipeline.
+`frontend/functions/api/[[path]].js` only proxies `/api` requests to that configured HTTPS origin; the browser cannot choose the destination. It carries the existing session and CSRF headers and does not add app authentication or business logic. `frontend/public/_routes.json` keeps static assets outside the Function route. Cloudflare Pages serves static assets even while Render is starting.
 
-## Free-tier limitations
+## Validation after deployment
 
-- Render documents 0.1 CPU and 512 MB RAM for a Free web service. It suspends a free service after 15 minutes without inbound traffic; the next request can take about a minute to wake it. Instance hours and bandwidth/build quotas also apply.
-- Render service filesystems are ephemeral. HTTP sessions live in backend memory and are lost on restart or spin-down. Neon is the database persistence layer; no real user data belongs there.
-- Neon Free quotas and behavior depend on its current plan and may change. Review the Neon dashboard for current compute, storage, and connection limits before deployment. Keep the pool small and avoid long-running transactions.
-- Cloudflare Pages serves static assets independently of Render availability. Pages Functions have their own free-plan request allowance; `/api/*` traffic consumes function invocations.
-- These free services have no availability guarantee or commercial SLA. Their policies, quotas, and features can change. The environment is for demonstration only, not commercial production.
+From the published HTTPS Pages URL, verify the SPA entry point and direct internal routes, static assets, and `/api/health`. Confirm Render completed Flyway and remains healthy after the Neon database wakes. Test login, logout, session cookies, CSRF on a mutation, role authorization, and organization isolation using only synthetic data. Verify dashboard, tickets, assets, user administration, SLAs, and approvals. Confirm the UI displays `v1.0.0`.
 
-Provider references: [Cloudflare Pages build settings](https://developers.cloudflare.com/pages/configuration/build-configuration/), [Pages Function routing and invocation rules](https://developers.cloudflare.com/pages/functions/routing/), [Render free service limits](https://render.com/docs/free), [Render port binding](https://render.com/docs/web-services), and [Neon documentation](https://neon.tech/docs/).
+Do not create a public ADMIN login or publish a password. No demo account is seeded unless a private reviewer credential is configured in Render. Do not copy local or Cypress accounts into the demo database. The seeded demo data, if enabled, is synthetic and belongs to one isolated organization. Document a manual reset procedure; do not add a paid scheduled job or external monitor.
+
+## Free-tier limits
+
+- Render Free Web Service: 512 MB RAM, 0.1 CPU, sleeps after 15 idle minutes, ephemeral filesystem, limited monthly included instance hours, bandwidth, and build minutes. It has no availability guarantee; prevent paid upgrades and watch usage.
+- Neon Free: verify current account quotas before release. At the time this guide was updated, the plan included 100 projects, 1 GB storage per project, and per-project compute/branch limits. The existing project also autoscales and can suspend to zero.
+- Cloudflare Pages Free: static asset delivery is separate from Function invocations. Pages Functions consume the Workers free request quota, and builds have monthly/concurrency limits.
+
+Provider policies change. Recheck the current [Render Free plan](https://render.com/docs/free) and [compute plans](https://render.com/docs/compute-plans), [Neon Free plan](https://neon.com/pricing) and [latest plan changes](https://neon.com/blog/category/changelog), and [Cloudflare Pages limits](https://developers.cloudflare.com/pages/platform/limits/) before publishing. This demonstration has no commercial SLA and is not for production business data.

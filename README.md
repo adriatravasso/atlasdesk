@@ -60,7 +60,7 @@ AtlasDesk is a modular monolith with a REST API and a React single-page applicat
 | Area | Technologies |
 | --- | --- |
 | API | Java 21, Spring Boot 3.5, Spring MVC, Spring Security, Spring Data JPA, Maven, JUnit 5 |
-| Web | React 18.3.1, TypeScript strict mode, Vite, React Router 6, Fetch API, native CSS |
+| Web | React 18.3.1, TypeScript strict mode, Vite, React Router 7, Fetch API, native CSS |
 | Data | PostgreSQL 16, Flyway |
 | Browser tests | Cypress 15, Chrome, TypeScript |
 | Development and CI | Docker Compose, Jenkins Declarative Pipeline |
@@ -198,6 +198,6 @@ Each build uses a unique Compose project and the isolated E2E database. It valid
 
 ## Decisions and current limitations
 
-The key implementation decisions and known product limitations are documented in [docs/decisions-and-limitations.md](docs/decisions-and-limitations.md). AtlasDesk does not currently provide email notifications, file attachments, ticket comments, password recovery, SSO, production deployment infrastructure, or historical reconstruction of pre-V6 ticket transitions.
+The key implementation decisions and known product limitations are documented in [docs/decisions-and-limitations.md](docs/decisions-and-limitations.md). AtlasDesk does not currently provide email notifications, file attachments, ticket comments, password recovery, or SSO. Deployment configuration and free-tier limits are documented in [docs/deployment.md](docs/deployment.md).
 
-The repository remains private. No release tag or public release is created by this task; a `v1.0.0` tag requires human review and explicit release approval after the ATL-0025 validation and PR review are complete.
+The repository remains private. Do not create a release tag or publish a stable release until the deployed build has passed validation and received explicit release approval.

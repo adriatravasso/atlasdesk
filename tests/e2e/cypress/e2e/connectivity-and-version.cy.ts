@@ -11,11 +11,11 @@ describe("demo startup and application version", () => {
       loginThroughUi(organizationId, admin, password);
       cy.get(".sidebar-foot .app-version")
         .should("be.visible")
-        .and("have.text", "AtlasDesk · v0.1.0");
+        .and("have.text", "AtlasDesk · v1.0.0");
       cy.viewport(375, 812);
       cy.get(".mobile-brand .app-version")
         .should("be.visible")
-        .and("have.text", "v0.1.0");
+        .and("have.text", "v1.0.0");
     });
   });
 
