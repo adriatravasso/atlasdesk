@@ -18,15 +18,19 @@ public class OrganizationAuthenticationProvider implements AuthenticationProvide
 
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAttemptLimiter loginAttempts;
 
-    public OrganizationAuthenticationProvider(UserRepository users, PasswordEncoder passwordEncoder) {
+    public OrganizationAuthenticationProvider(UserRepository users, PasswordEncoder passwordEncoder,
+            LoginAttemptLimiter loginAttempts) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.loginAttempts = loginAttempts;
     }
 
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         OrganizationLoginAuthenticationToken login = (OrganizationLoginAuthenticationToken) authentication;
+        loginAttempts.recordAttempt(login.getOrganizationId(), login.getEmail());
         User user = users.findByOrganizationIdAndEmailIgnoreCase(login.getOrganizationId(), login.getEmail())
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
 
@@ -36,6 +40,7 @@ public class OrganizationAuthenticationProvider implements AuthenticationProvide
         if (!user.isActive()) {
             throw new DisabledException("Account is disabled");
         }
+        loginAttempts.clear(login.getOrganizationId(), login.getEmail());
 
         AuthenticatedUser principal = new AuthenticatedUser(user.getId(), user.getOrganization().getId(),
                 user.getName(), user.getEmail(), user.getRole());

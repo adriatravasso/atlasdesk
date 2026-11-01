@@ -6,6 +6,7 @@ export default defineConfig({
     specPattern: "cypress/e2e/**/*.cy.ts",
     supportFile: "cypress/support/e2e.ts",
     screenshotsFolder: "/screenshots",
+    trashAssetsBeforeRuns: false,
     videosFolder: "artifacts/videos",
     video: true,
     screenshotOnRunFailure: true,

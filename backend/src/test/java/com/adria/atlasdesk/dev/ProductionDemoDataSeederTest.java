@@ -27,7 +27,7 @@ class ProductionDemoDataSeederTest {
         PasswordEncoder encoder = org.mockito.Mockito.mock(PasswordEncoder.class);
 
         CommandLineRunner runner = seeder.seedDemoAdministrator(
-                organizations, users, encoder, "", "demo@example.invalid", "AtlasDesk Public Demo");
+                organizations, users, encoder, true, "", "demo@example.invalid", "AtlasDesk Public Demo");
         runner.run();
 
         verify(organizations, never()).save(org.mockito.ArgumentMatchers.any(Organization.class));
@@ -47,7 +47,7 @@ class ProductionDemoDataSeederTest {
                 .thenReturn(false);
         when(encoder.encode("synthetic-demo-password")).thenReturn("bcrypt-hash");
 
-        seeder.seedDemoAdministrator(organizations, users, encoder,
+        seeder.seedDemoAdministrator(organizations, users, encoder, true,
                 "synthetic-demo-password", "demo-admin@example.invalid", "AtlasDesk Public Demo").run();
 
         verify(users).save(org.mockito.ArgumentMatchers.argThat(user ->
@@ -72,7 +72,7 @@ class ProductionDemoDataSeederTest {
                 .thenReturn(false);
         when(encoder.encode("private-demo-password")).thenReturn("encoded-password");
 
-        seeder.seedDemoRequester(organizations, users, encoder,
+        seeder.seedDemoRequester(organizations, users, encoder, true,
                 "private-demo-password", "demo.requester@atlasdesk.test", "AtlasDesk Public Demo").run();
 
         ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
@@ -82,5 +82,18 @@ class ProductionDemoDataSeederTest {
         assertThat(savedUser.getValue().getPasswordHash()).isEqualTo("encoded-password");
         assertThat(savedUser.getValue().getRole()).isEqualTo(UserRole.REQUESTER);
         assertThat(savedUser.getValue().isActive()).isTrue();
+    }
+
+    @Test
+    void doesNotSeedAccountsUnlessExplicitlyEnabled() throws Exception {
+        OrganizationRepository organizations = org.mockito.Mockito.mock(OrganizationRepository.class);
+        UserRepository users = org.mockito.Mockito.mock(UserRepository.class);
+        PasswordEncoder encoder = org.mockito.Mockito.mock(PasswordEncoder.class);
+
+        seeder.seedDemoRequester(organizations, users, encoder, false,
+                "private-demo-password", "demo.requester@atlasdesk.test", "AtlasDesk Public Demo").run();
+
+        verify(organizations, never()).save(org.mockito.ArgumentMatchers.any(Organization.class));
+        verify(users, never()).save(org.mockito.ArgumentMatchers.any(User.class));
     }
 }

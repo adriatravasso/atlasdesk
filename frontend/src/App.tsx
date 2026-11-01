@@ -661,6 +661,12 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const demoCredentials = {
+    organizationId: import.meta.env.VITE_DEMO_ORGANIZATION_ID || "1",
+    email: import.meta.env.VITE_DEMO_EMAIL || "demo.agent@atlasdesk.test",
+    password: import.meta.env.VITE_DEMO_PASSWORD || "AtlasDeskDemo2026!",
+  };
+  const showDemoCredentials = import.meta.env.VITE_DEMO_ENABLED === "true";
   const checkedInitialSession = useRef(false);
   const from = safeInternalPath(
     (location.state as { from?: { pathname?: unknown } } | null)?.from
@@ -685,9 +691,11 @@ function LoginPage() {
       navigate(from === "/login" ? "/" : from, { replace: true });
     } catch (cause) {
       setError(
-        cause instanceof ApiError && cause.status === 401
-          ? "Organização, e-mail ou senha inválidos."
-          : "Não foi possível entrar. Verifique os dados e tente novamente.",
+        cause instanceof ApiError && cause.status === 429
+          ? "Muitas tentativas de acesso. Aguarde um minuto antes de tentar novamente."
+          : cause instanceof ApiError && cause.status === 401
+            ? "Organização, e-mail ou senha inválidos."
+            : "Não foi possível entrar. Verifique os dados e tente novamente.",
       );
     } finally {
       setBusy(false);
@@ -760,6 +768,43 @@ function LoginPage() {
                 : "Aguardando servidor…"}
           </button>
         </form>
+        {showDemoCredentials && (
+          <section className="public-demo" aria-labelledby="public-demo-title">
+            <p className="eyebrow">DEMONSTRAÇÃO PÚBLICA</p>
+            <h2 id="public-demo-title">Conheça o AtlasDesk</h2>
+            <p className="public-demo-description">
+              Explore a plataforma com uma conta compartilhada e dados
+              fictícios.
+            </p>
+            <dl className="public-demo-credentials">
+              <div>
+                <dt>E-mail</dt>
+                <dd>{demoCredentials.email}</dd>
+              </div>
+              <div>
+                <dt>Senha</dt>
+                <dd>
+                  <code>{demoCredentials.password}</code>
+                </dd>
+              </div>
+            </dl>
+            <button
+              className="button button--quiet button--wide"
+              type="button"
+              onClick={() => {
+                setOrganizationId(demoCredentials.organizationId);
+                setEmail(demoCredentials.email);
+                setPassword(demoCredentials.password);
+                setError(null);
+              }}
+            >
+              Usar conta demonstrativa
+            </button>
+            <p className="public-demo-note">
+              Perfil de agente, limitado à organização fictícia.
+            </p>
+          </section>
+        )}
         <p className="login-footnote">
           O acesso é controlado pela sua organização.
         </p>
