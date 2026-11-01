@@ -2,6 +2,8 @@
 
 The API enforces these permissions in the service layer. Every organization-owned query and write is scoped to the authenticated session's `organizationId`; an organization or resource ID supplied by a client does not grant access to another tenant. Resources outside the caller's organization are treated as not found.
 
+The public portfolio account uses `AGENT` and belongs to the isolated `AtlasDesk Public Demo` organization. It can work tickets and assets there, but cannot view or manage the user directory or organization settings. See [hosted demo setup and restore behavior](deployment.md).
+
 | Functionality | ADMIN | AGENT | REQUESTER |
 | --- | --- | --- | --- |
 | Session profile (`/api/auth/me`) | Read own profile | Read own profile | Read own profile |
@@ -23,3 +25,5 @@ Dashboard ticket counts are organization-wide for ADMIN and AGENT, and requester
 The current product does not expose ticket comments or attachments. Do not infer access for unimplemented routes from this matrix; update this document together with any future API authorization change.
 
 Anonymous API requests return HTTP 401; authenticated users without a role permission receive HTTP 403. A resource outside the organization is indistinguishable from a missing resource and returns HTTP 404.
+
+Login is limited to 10 attempts per minute for each organization/email pair on each backend instance. Exceeding the threshold returns HTTP 429 with a `Retry-After` header.

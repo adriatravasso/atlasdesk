@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.UUID;
@@ -85,6 +86,23 @@ class AuthenticationControllerTest {
         postLogin(user, csrf, "wrong-password")
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("invalid_credentials"));
+    }
+
+    @Test
+    void rateLimitsRepeatedInvalidLoginAttempts() throws Exception {
+        User user = createUser(true);
+        CsrfFixture csrf = fetchCsrf();
+
+        for (int attempt = 0; attempt < 10; attempt++) {
+            postLogin(user, csrf, "wrong-password")
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error").value("invalid_credentials"));
+        }
+
+        postLogin(user, csrf, "wrong-password")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.error").value("too_many_attempts"));
     }
 
     @Test

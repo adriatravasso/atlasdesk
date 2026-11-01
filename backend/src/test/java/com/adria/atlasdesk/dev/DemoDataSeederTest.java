@@ -14,7 +14,10 @@ import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
 @ActiveProfiles("demo")
-@TestPropertySource(properties = "DEMO_USER_PASSWORD=integration-only-test-password")
+@TestPropertySource(properties = {
+        "DEMO_USER_PASSWORD=integration-only-test-password",
+        "DEMO_PUBLIC_PASSWORD=integration-public-test-password"
+})
 class DemoDataSeederTest {
 
     @Autowired
@@ -29,7 +32,8 @@ class DemoDataSeederTest {
     @Test
     void seedsRealisticDataWithValidWorkflowHistoryAndCanRunAgainWithoutDuplicates() {
         assertEquals(2, count("select count(*) from organizations where name in ('Atlas Technology', 'Nexus Solutions')"));
-        assertEquals(6, count("select count(*) from users where email like '%@atlasdemo.local' or email like '%@nexusdemo.local'"));
+        assertEquals(5, count("select count(*) from users where email like '%@atlasdemo.local' or email like '%@nexusdemo.local'"));
+        assertEquals(1, count("select count(*) from users where email = 'demo.agent@atlasdesk.test' and role = 'AGENT'"));
         assertEquals(12, count("select count(*) from assets where asset_number like 'ATLAS-%' or asset_number like 'NEXUS-%'"));
         assertEquals(24, count("select count(*) from tickets where title like '[DEMO-%'"));
         assertTrue(count("select count(*) from tickets where status = 'PENDING_APPROVAL'") >= 1);
@@ -40,6 +44,9 @@ class DemoDataSeederTest {
         String hash = jdbc.queryForObject(
                 "select password_hash from users where email = 'admin@atlasdemo.local'", String.class);
         assertTrue(passwordEncoder.matches("integration-only-test-password", hash));
+        String publicAgentHash = jdbc.queryForObject(
+                "select password_hash from users where email = 'demo.agent@atlasdesk.test'", String.class);
+        assertTrue(passwordEncoder.matches("integration-public-test-password", publicAgentHash));
 
         Map<String, Integer> before = seededRecordCounts();
         seeder.run();
@@ -53,7 +60,7 @@ class DemoDataSeederTest {
     private Map<String, Integer> seededRecordCounts() {
         return Map.of(
                 "organizations", count("select count(*) from organizations where name in ('Atlas Technology', 'Nexus Solutions')"),
-                "users", count("select count(*) from users where email like '%@atlasdemo.local' or email like '%@nexusdemo.local'"),
+                "users", count("select count(*) from users where email like '%@atlasdemo.local' or email like '%@nexusdemo.local' or email = 'demo.agent@atlasdesk.test'"),
                 "assets", count("select count(*) from assets where asset_number like 'ATLAS-%' or asset_number like 'NEXUS-%'"),
                 "tickets", count("select count(*) from tickets where title like '[DEMO-%'"),
                 "history", count("select count(*) from ticket_history_events h join tickets t on t.id = h.ticket_id where t.title like '[DEMO-%'"));

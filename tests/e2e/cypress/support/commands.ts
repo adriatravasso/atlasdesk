@@ -12,6 +12,7 @@ declare global {
   namespace Cypress {
     interface Chainable {
       resetE2eData(): Chainable<number>;
+      seedPublicDemo(): Chainable<number>;
     }
   }
 }
@@ -22,6 +23,19 @@ Cypress.Commands.add("resetE2eData", () => {
       cy.request({
         method: "POST",
         url: "/api/e2e/reset",
+        headers: { [body.headerName]: body.token },
+      }),
+    )
+    .its("status")
+    .should("eq", 204);
+});
+
+Cypress.Commands.add("seedPublicDemo", () => {
+  cy.request<{ headerName: string; token: string }>("GET", "/api/auth/csrf")
+    .then(({ body }) =>
+      cy.request({
+        method: "POST",
+        url: "/api/e2e/demo",
         headers: { [body.headerName]: body.token },
       }),
     )

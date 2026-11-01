@@ -1,40 +1,28 @@
-# Development
+# Desenvolvimento
 
-AtlasDesk's development, build, and validation environment is Docker Compose. The host needs Git and Docker Compose v2; do not install Java, Maven, Node.js, npm, PostgreSQL, Chrome, or Cypress locally.
+O ambiente de desenvolvimento, build e validação usa Docker Compose. No host, são necessários Git e Docker Compose v2; Java, Maven, Node.js, npm, PostgreSQL, Chrome e Cypress ficam nos containers.
 
-## Start the application
+## Iniciar
 
-Run from the repository root:
+Na raiz do repositório:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose --profile e2e config --quiet
+docker compose config --quiet
 docker compose up -d --build --wait db backend frontend
-docker compose ps
 ```
 
-Open <http://localhost:5173>. The backend is at <http://localhost:8080>, and its health endpoint is <http://localhost:8080/api/health>. Frontend and backend source are bind-mounted for live editing. PostgreSQL data and dependency caches use named volumes.
+Abra <http://localhost:5173>. A API fica em <http://localhost:8080> e sua verificação de saúde em <http://localhost:8080/api/health>. Código de backend e frontend é montado do host para edição ao vivo; PostgreSQL e caches usam volumes nomeados.
 
-The checked-in `.env.example` contains synthetic local database settings and leaves `DEV_ADMIN_PASSWORD` empty. To sign in locally, set a private password in the ignored `.env` file before starting the backend. The development seeder creates `atlasdesk-admin@localhost.test` only with the `dev` profile. Use a local-only password and never reuse it in a hosted environment.
+O perfil `dev` cria `atlasdesk-admin@localhost.test` somente quando `DEV_ADMIN_PASSWORD` está definido no `.env` ignorado pelo Git. Use uma senha local exclusiva. Para explorar os dados locais de demonstração, configure `SPRING_PROFILES_ACTIVE=demo`, `VITE_DEMO_ENABLED=true` e `DEMO_PUBLIC_PASSWORD` no `.env`. O perfil `demo` usa um banco local separado se você o iniciar com `-p atlasdesk-demo`.
 
-If a port is already occupied, change `POSTGRES_PORT`, `BACKEND_HOST_PORT`, or `FRONTEND_HOST_PORT` in `.env`. Internal service ports and Docker DNS names remain unchanged.
+O perfil `demo` contém dois conjuntos locais fictícios, incluindo a conta `AGENT` exibida na tela de login quando habilitada. Para iniciá-lo com banco e volumes isolados, use `docker compose -p atlasdesk-demo up -d --build --wait db backend frontend`; a senha continua em `.env`, nunca no repositório. Não use o banco de demonstração para dados reais.
 
-## Local demonstration data
+Se uma porta estiver ocupada, altere `POSTGRES_PORT`, `BACKEND_HOST_PORT` ou `FRONTEND_HOST_PORT` no `.env`. Os endereços internos continuam usando os nomes dos serviços Compose.
 
-The isolated `demo` profile seeds two fictional organizations, demo users for the existing roles, assets, and tickets. Set `DEMO_USER_PASSWORD` in the ignored `.env.demo` file; the password is not committed.
+## Validação
 
-```powershell
-Copy-Item .env.demo.example .env.demo
-# Edit .env.demo and set DEMO_USER_PASSWORD.
-docker compose -p atlasdesk-demo --env-file .env.demo config --quiet
-docker compose -p atlasdesk-demo --env-file .env.demo up -d --build --wait db backend frontend
-```
-
-For a fresh demo volume, the organizations are Atlas Technology (`1`) and Nexus Solutions (`2`). Stop the demo with `docker compose -p atlasdesk-demo --env-file .env.demo stop` to preserve its data.
-
-## Validation
-
-Start the development services first, then run checks in the application containers:
+Execute os comandos nos serviços em execução:
 
 ```powershell
 docker compose exec backend mvn -B -ntp test
@@ -42,33 +30,30 @@ docker compose exec backend mvn -B -ntp verify
 docker compose exec frontend npm run lint
 docker compose exec frontend npm run typecheck
 docker compose exec frontend npm run format:check
+docker compose exec frontend npm run test:proxy
 docker compose exec frontend npm run build
 ```
 
-The Cypress `e2e` profile uses its own PostgreSQL database, frontend, and backend. It seeds synthetic accounts from `tests/e2e/cypress/fixtures/accounts.json`, resets only its isolated database, and never connects to the development database.
+O perfil `e2e` usa outro PostgreSQL, backend e frontend. A suíte Cypress pode ser executada sob demanda:
 
 ```powershell
 docker compose --profile e2e run --rm e2e
 ```
 
-To regenerate only the six portfolio screenshots in `docs/screenshots/`:
+Ela restaura somente o banco sintético E2E. Para atualizar as imagens do portfólio:
 
 ```powershell
 docker compose --profile e2e run --rm --entrypoint sh e2e -c "npm ci --prefer-offline && npx cypress run --browser chrome --spec cypress/e2e/portfolio-screenshots.cy.ts"
 ```
 
-The screenshot workflow uses only synthetic data from the isolated E2E database. See the [E2E guide](../tests/e2e/README.md) for Cypress setup and reports.
+O guia E2E em [tests/e2e/README.md](../tests/e2e/README.md) cobre execução visual e artefatos.
 
-## Continuous integration
-
-The root `Jenkinsfile` is a Declarative Multibranch Pipeline. The agent needs Docker CLI, Compose v2, and a Docker Engine; application runtimes and browsers run in containers. Each build uses a unique Compose project, archives test reports and screenshots, and removes build containers and networks while preserving named volumes. Application containers do not mount the Docker socket.
-
-## Stop services
-
-Stop the local development services while preserving PostgreSQL data and dependency caches:
+## Encerrar
 
 ```powershell
 docker compose down
 ```
 
-Do not use `docker compose down -v` for routine development; it deletes named volumes.
+Esse comando preserva dados e caches nomeados. Não use `docker compose down -v` para o fluxo normal de desenvolvimento.
+
+O Jenkinsfile executa sua própria pipeline Compose com projeto isolado e não monta o socket Docker nos containers da aplicação.

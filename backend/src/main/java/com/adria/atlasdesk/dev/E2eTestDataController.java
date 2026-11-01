@@ -23,4 +23,10 @@ public class E2eTestDataController {
     public void reset() {
         data.reset();
     }
+
+    @PostMapping("/demo")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void seedPublicDemo() {
+        data.seedPublicDemo();
+    }
 }

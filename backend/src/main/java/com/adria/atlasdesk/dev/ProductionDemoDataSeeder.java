@@ -19,11 +19,12 @@ public class ProductionDemoDataSeeder {
     @Bean
     CommandLineRunner seedDemoAdministrator(OrganizationRepository organizations, UserRepository users,
             PasswordEncoder passwordEncoder,
+            @Value("${app.demo.seed-enabled:false}") boolean seedEnabled,
             @Value("${app.demo.admin-password:}") String adminPassword,
             @Value("${app.demo.admin-email:atlasdesk-demo@example.invalid}") String adminEmail,
             @Value("${app.demo.organization-name:AtlasDesk Public Demo}") String organizationName) {
         return args -> {
-            if (adminPassword.isBlank()) {
+            if (!seedEnabled || adminPassword.isBlank()) {
                 return;
             }
             if (!organizations.existsByName(organizationName)) {
@@ -40,11 +41,12 @@ public class ProductionDemoDataSeeder {
     @Bean
     CommandLineRunner seedDemoRequester(OrganizationRepository organizations, UserRepository users,
             PasswordEncoder passwordEncoder,
+            @Value("${app.demo.seed-enabled:false}") boolean seedEnabled,
             @Value("${app.demo.requester-password:}") String requesterPassword,
             @Value("${app.demo.requester-email:demo.requester@atlasdesk.test}") String requesterEmail,
             @Value("${app.demo.organization-name:AtlasDesk Public Demo}") String organizationName) {
         return args -> {
-            if (requesterPassword.isBlank()) {
+            if (!seedEnabled || requesterPassword.isBlank()) {
                 return;
             }
             if (!organizations.existsByName(organizationName)) {

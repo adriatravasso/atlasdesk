@@ -2,6 +2,7 @@ package com.adria.atlasdesk.ticket;
 
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.Modifying;
 import com.adria.atlasdesk.dashboard.TicketAggregateMetrics;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Ticket ticket where ticket.organization.id = :organizationId")
+    int deleteAllByOrganizationId(@Param("organizationId") Long organizationId);
 
     @Query("""
             select new com.adria.atlasdesk.dashboard.TicketAggregateMetrics(

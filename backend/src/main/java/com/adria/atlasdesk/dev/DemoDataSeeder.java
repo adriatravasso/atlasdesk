@@ -80,10 +80,14 @@ public class DemoDataSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
     private final String demoPassword;
+    private final String publicEmail;
+    private final String publicPassword;
 
     public DemoDataSeeder(OrganizationRepository organizations, UserRepository users, AssetRepository assets,
             TicketRepository tickets, TicketHistoryRepository history, PasswordEncoder passwordEncoder, Clock clock,
-            @Value("${app.demo.user-password:}") String demoPassword) {
+            @Value("${app.demo.user-password:}") String demoPassword,
+            @Value("${app.demo.public-email:demo.agent@atlasdesk.test}") String publicEmail,
+            @Value("${app.demo.public-password:}") String publicPassword) {
         this.organizations = organizations;
         this.users = users;
         this.assets = assets;
@@ -92,6 +96,8 @@ public class DemoDataSeeder implements CommandLineRunner {
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
         this.demoPassword = demoPassword;
+        this.publicEmail = publicEmail;
+        this.publicPassword = publicPassword;
     }
 
     @Override
@@ -111,11 +117,16 @@ public class DemoDataSeeder implements CommandLineRunner {
     }
 
     private void seedOrganization(DemoOrganization organization, String emailDomain, List<TicketSeed> ticketSeeds) {
+        boolean portfolioOrganization = organization.entity().getName().equals("Atlas Technology")
+                && publicPassword != null && !publicPassword.isBlank();
         DemoAccounts accounts = new DemoAccounts(
                 getOrCreateUser(organization.entity(), "Administrador " + organization.entity().getName(),
                         "admin@" + emailDomain, UserRole.ADMIN),
-                getOrCreateUser(organization.entity(), "Agente de suporte " + organization.entity().getName(),
-                        "agent@" + emailDomain, UserRole.AGENT),
+                portfolioOrganization
+                        ? getOrCreatePublicAgent(organization.entity())
+                        : getOrCreateUser(organization.entity(),
+                                "Agente de suporte " + organization.entity().getName(),
+                                "agent@" + emailDomain, UserRole.AGENT),
                 getOrCreateUser(organization.entity(), "Solicitante " + organization.entity().getName(),
                         "requester@" + emailDomain, UserRole.REQUESTER));
         List<Asset> organizationAssets = getOrCreateAssets(organization);
@@ -130,9 +141,26 @@ public class DemoDataSeeder implements CommandLineRunner {
     }
 
     private User getOrCreateUser(Organization organization, String name, String email, UserRole role) {
+        return getOrCreateUser(organization, name, email, role, demoPassword);
+    }
+
+    private User getOrCreateUser(Organization organization, String name, String email, UserRole role,
+            String accountPassword) {
         return users.findByOrganizationIdAndEmailIgnoreCase(organization.getId(), email)
                 .orElseGet(() -> users.save(new User(organization, name, email,
-                        passwordEncoder.encode(demoPassword), role)));
+                        passwordEncoder.encode(accountPassword), role)));
+    }
+
+    private User getOrCreatePublicAgent(Organization organization) {
+        return users.findByOrganizationIdAndEmailIgnoreCase(organization.getId(), publicEmail)
+                .or(() -> users.findByOrganizationIdAndEmailIgnoreCase(organization.getId(), "agent@atlasdemo.local"))
+                .map(existing -> {
+                    existing.updateProfile("Agente de suporte Atlas Technology", publicEmail, UserRole.AGENT, true,
+                            passwordEncoder.encode(publicPassword));
+                    return existing;
+                })
+                .orElseGet(() -> users.save(new User(organization, "Agente de suporte Atlas Technology", publicEmail,
+                        passwordEncoder.encode(publicPassword), UserRole.AGENT)));
     }
 
     private List<Asset> getOrCreateAssets(DemoOrganization organization) {

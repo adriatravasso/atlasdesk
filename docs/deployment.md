@@ -1,36 +1,40 @@
-# Hosted demonstration
+# Deploy e demonstração pública
 
-AtlasDesk uses free-tier services for a public, non-commercial demonstration. Do not store personal or business data in this environment.
+## Componentes atuais
 
-## Current deployment
-
-| Component | Provider and resource | Configuration |
+| Camada | Serviço | Configuração documentada |
 | --- | --- | --- |
-| Frontend | [Cloudflare Pages — atlasdesk](https://atlasdesk.pages.dev) | Private repository `adriatravasso/atlasdesk`, production branch `main`, root `frontend`, build `npm ci && npm run build`, output `dist` |
-| API | [Render — atlasdesk-api](https://atlasdesk-api.onrender.com) | Free Docker Web Service in Ohio, Dockerfile `backend/Dockerfile`, production profile, health endpoint `/api/health` |
-| Database | Neon project `atlasdesk`, branch `production`, database `atlasdeskdb` | PostgreSQL 18, TLS JDBC connection, dedicated `atlasdesk_app` role, Flyway migrations through V6 |
+| Frontend e proxy `/api/*` | [Cloudflare Pages](https://atlasdesk.pages.dev) | Repositório `adriatravasso/atlasdesk`, branch `main`, raiz `frontend`, build `npm ci && npm run build`, saída `dist`; Pages Function encaminha para a API |
+| API | [Render](https://atlasdesk-api.onrender.com/api/health) | Web Service Docker, imagem definida por `backend/Dockerfile`, perfil `prod`, endpoint de saúde `/api/health` |
+| Banco | Neon, projeto `atlasdesk` | PostgreSQL gerenciado; conexão JDBC/TLS configurada no Render e migrations Flyway aplicadas pela API |
 
-Cloudflare Pages builds the frontend from `main` and serves static files at `https://atlasdesk.pages.dev`. Its `/api/*` Pages Function forwards requests to `https://atlasdesk-api.onrender.com`. The browser never receives the database URL or password. The backend health endpoint returned HTTP 200 after the first Render deploy and all six Flyway migrations completed successfully against PostgreSQL 18.6.
+O repositório é público. O frontend usa o proxy Pages para manter a API na mesma origem do navegador. URL pública da aplicação: <https://atlasdesk.pages.dev>.
 
-## Provider settings
+## Habilitar a conta de demonstração
 
-The Cloudflare Pages project is connected to the private GitHub repository and production branch `main`. Its production settings include `NODE_VERSION=22.13.0` and the Pages Function variable `ATLASDESK_API_ORIGIN=https://atlasdesk-api.onrender.com`.
+A implementação desta branch adiciona uma conta `AGENT` com dados sintéticos. O login usa a autenticação e o banco reais. Para publicar essa versão, após integração da branch:
 
-Render receives `SPRING_PROFILES_ACTIVE=prod`, the Neon JDBC URL and credentials as service environment variables, `DB_POOL_MAX=3`, and `SESSION_COOKIE_SECURE=true`. Render supplies the listening `PORT`. Keep database credentials only in Render's secret environment. Do not configure `DEMO_ADMIN_PASSWORD` for public access or publish any administrator credentials. A restricted demo requester is provisioned using the secret `DEMO_REQUESTER_PASSWORD`; its default email is `demo.requester@atlasdesk.test`.
+1. No Render, habilite `DEMO_SEED_ENABLED=true` e defina `DEMO_PUBLIC_PASSWORD=AtlasDeskDemo2026!`. O valor é uma credencial pública de portfólio, não um segredo administrativo. `DEMO_PUBLIC_EMAIL` pode manter `demo.agent@atlasdesk.test`; `DEMO_ORGANIZATION_NAME` pode manter `AtlasDesk Public Demo`.
+2. Leia nos logs de inicialização do Render o ID da organização informado pelo seed. Na build de produção do Cloudflare Pages, configure `VITE_DEMO_ENABLED=true`, `VITE_DEMO_ORGANIZATION_ID=<id da organização demo>`, `VITE_DEMO_EMAIL=demo.agent@atlasdesk.test` e `VITE_DEMO_PASSWORD=AtlasDeskDemo2026!`. Essas variáveis `VITE_` ficam incorporadas no JavaScript entregue publicamente. Nunca coloque nelas secrets privados.
+3. Faça um deploy do backend e da página e valide login, dashboard, chamados, ativos e isolamento.
 
-Neon currently runs PostgreSQL 18.6 in `aws-us-east-2`. The `production` branch was empty of AtlasDesk application tables before the first deployment. The dedicated application role has database connect and `public` schema usage/create privileges required by Flyway and the application. Flyway applies schema changes at backend startup; Hibernate validates the resulting schema.
+Não foi feito reset do banco, mudança de secrets dos provedores ou deploy de produção nesta task. Até validar a configuração acima, a nova conta e o seed não devem ser considerados disponíveis no site hospedado.
 
-## Authentication and data
+O seed roda apenas no perfil `prod` e quando `DEMO_SEED_ENABLED` está ligado. Ele cria a organização demo se ausente e usuários sintéticos para os papéis necessários. A conta exibida é `AGENT`, portanto pode operar chamados e ativos da própria organização, mas não administrar usuários nem acessar organizações alheias. A senha pública aparece na interface e não pode ser reutilizada em outro ambiente.
 
-The hosted demo provisions a synthetic `REQUESTER` account in the `AtlasDesk Public Demo` organization when `DEMO_REQUESTER_PASSWORD` is set in Render. It can create and view requester tickets within that organization, but cannot administer the platform or access another organization. Share the password out of band; never commit it or publish it in documentation. Do not use E2E credentials or local seeded accounts in the hosted database, and do not add a public ADMIN password.
+## Persistência e restauração
 
-The API keeps session and CSRF protection enabled. Session cookies use HTTPS settings, and organization scope comes from the authenticated backend session. Render's filesystem is ephemeral and in-memory sessions are lost when the free service restarts or wakes from idle.
+Na inicialização habilitada, o backend remove chamados, histórico e ativos somente da organização `AtlasDesk Public Demo` e recria o conjunto inicial. Usuários e organização são preservados; dados de outras organizações não são tocados. Essa restauração acontece quando a instância inicia ou reinicia, não há cron nem endpoint de reset público. Mudanças feitas por visitantes persistem até a próxima inicialização do backend.
 
-## Limits
+O login limita cada combinação organização/e-mail a 10 tentativas por minuto por instância do backend. Ao exceder o limite, a API retorna HTTP 429 com `Retry-After`; a tela informa para aguardar. O contador usa memória local e é reiniciado junto com o processo. Ao executar múltiplas instâncias, use um limitador compartilhado antes de escalar.
 
-- Render Free provides limited CPU and memory, suspends after inactivity, and can take about a minute to wake. It has no production SLA.
-- Neon Free has storage, compute, branch, and connection limits; keep the Hikari pool small and monitor the current plan quotas.
-- Cloudflare Pages serves static assets separately from Pages Functions. API calls use Functions and count toward the applicable free request limits.
-- None of these services provides a business backup, incident response, or production availability guarantee for this demo.
+A demo é compartilhada. Alterações concorrentes podem ser vistas por outras pessoas; eventos de encerramento de serviço gratuito podem restaurar dados mais cedo do que o esperado. Não insira dados pessoais ou reais. Para limites de hospedagem, veja abaixo e a [nota de decisões](decisions-and-limitations.md).
 
-Provider quotas and behavior can change. Recheck [Render Free limits](https://render.com/docs/free), the [Neon plan](https://neon.com/pricing), and [Cloudflare Pages limits](https://developers.cloudflare.com/pages/platform/limits/) before materially changing the deployment.
+## Operação e limites
+
+- Render Free suspende serviços inativos e pode demorar para acordar; não há SLA de produção.
+- Neon Free possui limites de armazenamento, compute e conexões; o pool do backend é pequeno por configuração.
+- Cloudflare Pages Functions atende as requisições da API e está sujeito aos limites do plano.
+- Esta demonstração não oferece backup de negócio, monitoramento externo ou processo de resposta a incidentes.
+
+Consulte [Render Free](https://render.com/docs/free), [preços do Neon](https://neon.com/pricing) e [limites do Cloudflare Pages](https://developers.cloudflare.com/pages/platform/limits/) antes de alterar o deploy.

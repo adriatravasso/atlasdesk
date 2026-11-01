@@ -7,6 +7,10 @@ describe("AtlasDesk portfolio walkthrough screenshots", () => {
   });
 
   it("captures real application screens through a representative workflow", () => {
+    cy.visit("/login");
+    cy.get(".public-demo").should("be.visible");
+    cy.screenshot("portfolio-login", { capture: "viewport" });
+
     loadAccounts().then(
       ({ organizationId, admin, agent, requester, password }) => {
         loginThroughUi(organizationId, admin, password, "/");

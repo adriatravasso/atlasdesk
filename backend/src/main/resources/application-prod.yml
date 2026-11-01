@@ -30,10 +30,13 @@ app:
   security:
     cookie-secure: true
   demo:
+    seed-enabled: ${DEMO_SEED_ENABLED:false}
     admin-password: ${DEMO_ADMIN_PASSWORD:}
     admin-email: ${DEMO_ADMIN_EMAIL:atlasdesk-demo@example.invalid}
     requester-password: ${DEMO_REQUESTER_PASSWORD:}
     requester-email: ${DEMO_REQUESTER_EMAIL:demo.requester@atlasdesk.test}
+    public-email: ${DEMO_PUBLIC_EMAIL:demo.agent@atlasdesk.test}
+    public-password: ${DEMO_PUBLIC_PASSWORD:}
     organization-name: ${DEMO_ORGANIZATION_NAME:AtlasDesk Public Demo}
 
 logging:

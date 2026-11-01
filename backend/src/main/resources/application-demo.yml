@@ -1,3 +1,5 @@
 app:
   demo:
     user-password: ${DEMO_USER_PASSWORD:}
+    public-password: ${DEMO_PUBLIC_PASSWORD:}
+    public-email: ${DEMO_PUBLIC_EMAIL:demo.agent@atlasdesk.test}

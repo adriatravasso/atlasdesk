@@ -32,6 +32,10 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       APP_DEV_ADMIN_PASSWORD: ${DEV_ADMIN_PASSWORD:-}
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
+      DEMO_SEED_ENABLED: ${DEMO_SEED_ENABLED:-false}
+      DEMO_PUBLIC_EMAIL: ${DEMO_PUBLIC_EMAIL:-demo.agent@atlasdesk.test}
+      DEMO_PUBLIC_PASSWORD: ${DEMO_PUBLIC_PASSWORD:-}
+      DEMO_ORGANIZATION_NAME: ${DEMO_ORGANIZATION_NAME:-AtlasDesk Public Demo}
     ports:
       - "${BACKEND_HOST_PORT:-8080}:8080"
     volumes:
@@ -58,6 +62,10 @@ services:
     restart: unless-stopped
     environment:
       VITE_API_TARGET: http://backend:8080
+      VITE_DEMO_ENABLED: ${VITE_DEMO_ENABLED:-false}
+      VITE_DEMO_ORGANIZATION_ID: ${DEMO_ORGANIZATION_ID:-1}
+      VITE_DEMO_EMAIL: ${DEMO_PUBLIC_EMAIL:-demo.agent@atlasdesk.test}
+      VITE_DEMO_PASSWORD: ${DEMO_PUBLIC_PASSWORD:-}
     ports:
       - "${FRONTEND_HOST_PORT:-5173}:5173"
     volumes:
@@ -130,6 +138,7 @@ services:
       DB_PASSWORD: atlasdesk_e2e
       SPRING_PROFILES_ACTIVE: e2e
       SESSION_COOKIE_SECURE: "false"
+      DEMO_PUBLIC_PASSWORD: ${DEMO_PUBLIC_PASSWORD:-AtlasDeskDemo2026!}
     volumes:
       - ./backend:/workspace/backend
       - maven_cache:/root/.m2
@@ -154,6 +163,10 @@ services:
     profiles: ["e2e"]
     environment:
       VITE_API_TARGET: http://e2e-backend:8080
+      VITE_DEMO_ENABLED: "true"
+      VITE_DEMO_ORGANIZATION_ID: "3"
+      VITE_DEMO_EMAIL: ${DEMO_PUBLIC_EMAIL:-demo.agent@atlasdesk.test}
+      VITE_DEMO_PASSWORD: ${DEMO_PUBLIC_PASSWORD:-AtlasDeskDemo2026!}
     volumes:
       - ./frontend:/workspace/frontend
       - frontend_node_modules:/workspace/frontend/node_modules

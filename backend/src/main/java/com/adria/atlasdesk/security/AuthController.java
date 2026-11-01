@@ -58,6 +58,9 @@ public class AuthController {
         try {
             authentication = authenticationManager.authenticate(
                     new OrganizationLoginAuthenticationToken(login.organizationId(), login.email(), login.password()));
+        } catch (LoginAttemptLimiter.TooManyLoginAttemptsException exception) {
+            response.setHeader("Retry-After", Long.toString(exception.getRetryAfterSeconds()));
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(new ApiError("too_many_attempts"));
         } catch (AuthenticationException exception) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiError("invalid_credentials"));
         }

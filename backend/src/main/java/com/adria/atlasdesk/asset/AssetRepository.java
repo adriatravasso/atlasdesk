@@ -1,6 +1,7 @@
 package com.adria.atlasdesk.asset;
 
 import java.util.Optional;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AssetRepository extends JpaRepository<Asset, Long> {
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Asset asset where asset.organization.id = :organizationId")
+    int deleteAllByOrganizationId(@Param("organizationId") Long organizationId);
 
     long countByOrganizationIdAndStatus(Long organizationId, AssetStatus status);
 
