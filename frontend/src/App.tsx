@@ -156,6 +156,7 @@ function Shell({
           {user.organizationId
             ? `Organização ${user.organizationId}`
             : "Espaço de trabalho"}
+          <span className="app-version">v0.0.1</span>
         </div>
       </aside>
       <div className="main-column">
