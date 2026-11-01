@@ -17,9 +17,10 @@ This note records decisions that affect the existing behavior. It is not a roadm
 - The dashboard provides current aggregate counts and priority distribution, not historical reporting or exports.
 - SLA durations are elapsed hours, not business hours, and there is no background job or escalation notification.
 - Migration V6 records new history events and adds a creation event for existing tickets. It does not reconstruct earlier assignment or status-change history.
-- Compose and the production image provide a local development/runtime foundation. This repository does not include deployed production infrastructure, backups, monitoring, or an operational incident process.
+- The hosted demonstration uses Cloudflare Pages, Render Free, and Neon Free; it has no business backup, external monitoring, or operational incident process. See [deployment details](deployment.md).
 - Demo accounts and passwords belong exclusively to the E2E profile and its isolated database. They must never be reused outside it.
+- The hosted frontend has no public demo identity. A valid user is required to sign in; no ADMIN credentials are published.
 
 ## Release gate
 
-ATL-0025 proposes portfolio readiness for review; it does not create a version tag or publish a release. Create `v1.0.0` only after a human has reviewed the ATL-0025 PR, accepted its validation evidence and remaining limitations, and explicitly approved a release.
+Do not create a stable release tag until the deployed build has passed validation, the remaining limitations have been reviewed, and a human has explicitly approved the release.
